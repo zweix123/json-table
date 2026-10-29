@@ -30,14 +30,13 @@
     table { table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 14px; line-height: 1.5; }
     th, td { padding: 8px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid #e9edf3; border-right: 1px solid #edf0f5; overflow-wrap: anywhere; white-space: pre-wrap; }
     th { position: sticky; top: 0; z-index: 1; background: #f0f4fa; color: #455975; font-weight: 600; box-shadow: 0 1px 0 #dfe5ed; }
-    .column-heading { display: flex; align-items: flex-start; gap: 4px; }
-    .sort-button > span:first-child { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .column-heading { display: flex; align-items: flex-start; gap: 8px; }
+    .column-label { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .resize-handle { position: absolute; top: 0; right: -1px; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; }
     .resize-handle:hover, .resize-handle:focus-visible { background: #90b5ff66; outline: 0; }
-    .sort-button { flex: 1; min-width: 0; height: auto; justify-content: flex-start; padding: 0; border-radius: 3px; background: transparent; color: inherit; font: inherit; text-align: left; white-space: normal; overflow-wrap: anywhere; }
     .sort-button:hover, .filter-button:hover { background: #e1e9f6; }
     .sort-mark { flex-shrink: 0; color: #67758a; font-size: 12px; }
-    .filter-button { flex-shrink: 0; width: 24px; height: 24px; padding: 3px; background: transparent; color: #67758a; border-radius: 3px; }
+    .sort-button, .filter-button { flex-shrink: 0; width: 24px; height: 24px; padding: 3px; background: transparent; color: #67758a; border-radius: 3px; }
     .filter-button[aria-pressed="true"], th[aria-sort]:not([aria-sort="none"]) .sort-mark { color: #285cce; }
     .filter-button[aria-pressed="true"] { background: #dae7ff; }
     #column-filter { position: fixed; inset: auto; margin: 0; width: min(300px, calc(100vw - 24px)); padding: 16px; border: 1px solid #bdc9da; border-radius: 8px; box-shadow: 0 6px 24px #26344926; color: #263449; background: #fff; font-size: 13px; }
@@ -260,11 +259,11 @@
       }
       widths.sort((a, b) => a - b);
       const content = widths[Math.floor((widths.length - 1) * .9)] || 0;
-      return Math.min(maximum, Math.max(120, textWidth(column) + 72, content + 24));
+      return Math.min(maximum, Math.max(120, textWidth(column) + 88, content + 24));
     }
 
     function setColumnWidth(column, width) {
-      columnState.get(column).width = Math.max(96, Math.min(1200, Math.round(width)));
+      columnState.get(column).width = Math.max(112, Math.min(1200, Math.round(width)));
       applyLayout();
     }
 
@@ -284,7 +283,7 @@
       handle.setAttribute('role', 'separator');
       handle.setAttribute('aria-orientation', 'vertical');
       handle.setAttribute('aria-label', `调整列宽：${column}`);
-      handle.setAttribute('aria-valuemin', '96');
+      handle.setAttribute('aria-valuemin', '112');
       handle.setAttribute('aria-valuemax', '1200');
       handle.title = '拖动调整列宽，双击适配内容；方向键也可调整';
       let drag = null;
@@ -505,12 +504,13 @@
         sortButton.type = 'button';
         sortButton.className = 'sort-button';
         const label = document.createElement('span');
+        label.className = 'column-label';
         label.textContent = column;
         label.title = column;
         const mark = document.createElement('span');
         mark.className = 'sort-mark';
         mark.setAttribute('aria-hidden', 'true');
-        sortButton.append(label, mark);
+        sortButton.append(mark);
         sortButton.addEventListener('click', () => cycleSort(column));
         const filterButton = document.createElement('button');
         filterButton.type = 'button';
@@ -532,7 +532,7 @@
         icon.append(path);
         filterButton.append(icon);
         filterButton.addEventListener('click', () => openFilter(column, filterButton));
-        heading.append(sortButton, filterButton);
+        heading.append(label, sortButton, filterButton);
         cell.append(heading);
         const resizeHandle = addResizeHandle(column, cell);
         headings.set(column, { cell, sortButton, mark, filterButton, resizeHandle });

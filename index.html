@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="local-file-token" content="">
+  <title>JSON 表格</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; color: #263449; background: #f5f7fa; }
+    * { box-sizing: border-box; }
+    body { margin: 0; height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
+    header { display: flex; align-items: center; gap: 16px; min-height: 56px; padding: 10px 16px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+    h1 { flex-shrink: 0; margin: 0; font-size: 16px; font-weight: 650; letter-spacing: -.5px; }
+    button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 34px; padding: 0 12px; border: 0; border-radius: 6px; background: #285cce; color: #fff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    button:hover { background: #214eaf; }
+    button:disabled { opacity: .5; cursor: default; }
+    button:focus-visible, input:focus-visible, select:focus-visible, .table-wrap:focus-visible { outline: 3px solid #90b5ff; outline-offset: 3px; }
+    main { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 8px 12px 12px; }
+    .source { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+    #path-form { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .or { color: #67758a; font-size: 13px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+    #path { flex: 1; min-width: 0; width: 100%; height: 34px; border: 1px solid #bdc9da; border-radius: 6px; padding: 0 10px; color: #263449; background: #fff; font: 13px ui-monospace, "SFMono-Regular", Consolas, monospace; }
+    #path::placeholder { color: #788699; }
+    .secondary { background: #fff; color: #263449; border: 1px solid #bdc9da; }
+    .secondary:hover { background: #edf0f5; }
+    #error { margin: 0 0 8px; padding: 8px 12px; border-left: 3px solid #b42318; background: #fff1f0; color: #912018; font-size: 14px; line-height: 1.6; }
+    #drop-hint { position: fixed; inset: 12px; z-index: 3; display: grid; place-items: center; border: 2px dashed #285cce; border-radius: 8px; background: #edf4fff2; color: #214eaf; font-size: 20px; pointer-events: none; }
+    body:not(.dragging) #drop-hint { display: none; }
+    .meta { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; max-width: 180px; color: #67758a; font-size: 12px; line-height: 1.3; }
+    #filename { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    #count { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .table-wrap { flex: 1; min-height: 0; overflow: auto; border: 1px solid #dfe5ed; border-radius: 6px; background: #fff; }
+    .empty { height: 100%; min-height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; color: #758296; font-size: 14px; }
+    .empty strong { color: #3b4c64; font-size: 17px; font-weight: 500; }
+    table { table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 14px; line-height: 1.5; }
+    th, td { padding: 8px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid #e9edf3; border-right: 1px solid #edf0f5; overflow-wrap: anywhere; white-space: pre-wrap; }
+    th { position: sticky; top: 0; z-index: 1; background: #f0f4fa; color: #455975; font-weight: 600; box-shadow: 0 1px 0 #dfe5ed; }
+    .column-heading { display: flex; align-items: flex-start; gap: 4px; }
+    .sort-button > span:first-child { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .resize-handle { position: absolute; top: 0; right: -1px; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; }
+    .resize-handle:hover, .resize-handle:focus-visible { background: #90b5ff66; outline: 0; }
+    th.pinned { z-index: 2; }
+    td.pinned { position: sticky; z-index: 1; background: #fff; }
+    tbody tr:nth-child(even) td.pinned { background: #fafbfd; }
+    tbody tr:hover td.pinned { background: #edf4ff; }
+    .pin-edge { border-right: 2px solid #bdc9da; }
+    .cell-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+    table.compact .cell-text { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+    .expand-cell { display: block; height: 22px; padding: 0; margin-top: 3px; background: transparent; color: #285cce; font-size: 12px; font-weight: 400; }
+    .expand-cell:hover { background: transparent; text-decoration: underline; }
+    #display-mode { height: 34px; max-width: 100px; padding: 0 8px; border: 1px solid #bdc9da; border-radius: 6px; background: #fff; color: #263449; font: inherit; font-size: 13px; }
+    .sort-button { flex: 1; min-width: 0; height: auto; justify-content: flex-start; padding: 0; border-radius: 3px; background: transparent; color: inherit; font: inherit; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+    .sort-button:hover, .filter-button:hover { background: #e1e9f6; }
+    .sort-mark { flex-shrink: 0; color: #67758a; font-size: 12px; }
+    .filter-button { flex-shrink: 0; width: 24px; height: 24px; padding: 3px; background: transparent; color: #67758a; border-radius: 3px; }
+    .filter-button[aria-pressed="true"], th[aria-sort]:not([aria-sort="none"]) .sort-mark { color: #285cce; }
+    .filter-button[aria-pressed="true"] { background: #dae7ff; }
+    #column-filter { position: fixed; inset: auto; margin: 0; width: min(300px, calc(100vw - 24px)); padding: 16px; border: 1px solid #bdc9da; border-radius: 8px; box-shadow: 0 6px 24px #26344926; color: #263449; background: #fff; font-size: 13px; }
+    #column-filter h2 { margin: 0 0 14px; max-height: 84px; overflow: auto; font-size: 14px; overflow-wrap: anywhere; }
+    #column-filter label { display: block; margin: 12px 0 6px; }
+    #column-filter input, #column-filter select { width: 100%; height: 34px; padding: 0 8px; border: 1px solid #bdc9da; border-radius: 5px; background: #fff; color: inherit; font: inherit; }
+    .filter-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 16px; }
+    #column-settings { position: fixed; inset: auto; margin: 0; width: min(380px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; padding: 16px; border: 1px solid #bdc9da; border-radius: 8px; box-shadow: 0 6px 24px #26344926; background: #fff; color: #263449; font-size: 13px; }
+    #column-settings h2 { margin: 0 0 8px; font-size: 15px; }
+    #column-settings p { margin: 0 0 12px; color: #67758a; line-height: 1.6; }
+    #columns-search { width: 100%; height: 34px; padding: 0 8px; border: 1px solid #bdc9da; border-radius: 5px; font: inherit; }
+    #columns-list { max-height: 45dvh; overflow: auto; margin-top: 8px; }
+    .column-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #edf0f5; }
+    .column-option label { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .column-option label:first-child { flex: 1; }
+    .column-option span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .column-option input { flex-shrink: 0; accent-color: #285cce; }
+    #cell-detail { width: min(720px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 24px; border: 1px solid #bdc9da; border-radius: 8px; color: #263449; }
+    #cell-detail::backdrop { background: #26344966; }
+    #cell-detail h2 { margin: 0 0 16px; font-size: 16px; overflow-wrap: anywhere; }
+    #detail-text { max-height: 60dvh; overflow: auto; margin-bottom: 16px; font-size: 14px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+    th:last-child, td:last-child { border-right: 0; }
+    tbody tr:nth-child(even) { background: #fafbfd; }
+    tbody tr:hover { background: #edf4ff; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .no-rows { text-align: center; color: #758296; padding: 40px 18px; }
+    [hidden] { display: none !important; }
+    @media (max-width: 760px) { header { flex-wrap: wrap; gap: 8px 12px; padding: 8px 12px; } .source { order: 3; flex-basis: 100%; } .meta { margin-left: auto; max-width: 60%; flex-direction: row; gap: 8px; min-width: 0; } #filename { min-width: 0; } .or { display: none; } }
+    @media (max-width: 480px) { button, #path { height: 44px; } .source { flex-wrap: wrap; gap: 8px; } #path-form { flex-basis: 100%; } main { padding: 6px 8px 8px; } th, td { padding: 8px 10px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>JSON 表格</h1>
+    <section class="source" aria-label="导入 JSON 文件">
+      <button id="import" class="secondary" type="button">选择文件…</button>
+      <input id="file" type="file" accept=".json,application/json" hidden>
+      <form id="path-form" hidden>
+        <span class="or" aria-hidden="true">或</span>
+        <label class="sr-only" for="path">JSON 文件绝对路径</label>
+        <input id="path" type="text" placeholder="粘贴 JSON 文件的绝对路径" autocomplete="off" spellcheck="false" aria-describedby="error">
+        <button id="load-path" type="submit" disabled>导入</button>
+      </form>
+    </section>
+    <button id="columns-button" class="secondary" type="button" popovertarget="column-settings" hidden>列设置</button>
+    <select id="display-mode" aria-label="内容显示模式" hidden><option value="compact">紧凑显示</option><option value="full">完整显示</option></select>
+    <button id="reset-view" class="secondary" type="button" hidden>重置排序与筛选</button>
+    <div class="meta" role="status" aria-live="polite">
+      <span id="filename">尚未打开文件</span>
+      <span id="count"></span>
+    </div>
+  </header>
+  <main>
+    <div id="error" role="alert" hidden></div>
+    <div id="table-wrap" class="table-wrap" tabindex="0" role="region" aria-label="JSON 数据表格">
+      <div id="empty" class="empty"><strong>拖入 JSON 文件，查看表格</strong><span>支持 columns / rows 格式，最大 20 MB</span></div>
+      <table id="table" aria-label="导入的 JSON 数据" hidden></table>
+    </div>
+  </main>
+  <section id="column-settings" popover aria-labelledby="columns-title">
+    <h2 id="columns-title">列设置</h2>
+    <p>勾选显示列，冻结列显示在左侧。隐藏列的筛选仍然生效。</p>
+    <input id="columns-search" type="search" aria-label="搜索列名" placeholder="搜索列名">
+    <div id="columns-list"></div>
+    <div class="filter-actions"><button id="show-all-columns" class="secondary" type="button">显示全部列</button><button id="reset-widths" class="secondary" type="button">重置列宽</button></div>
+  </section>
+  <dialog id="cell-detail" aria-labelledby="detail-title"><h2 id="detail-title"></h2><div id="detail-text" tabindex="0"></div><button id="close-detail" type="button">关闭</button></dialog>
+  <form id="column-filter" popover role="dialog" aria-labelledby="filter-title">
+    <h2 id="filter-title"></h2>
+    <label for="filter-mode">筛选条件</label>
+    <select id="filter-mode">
+      <option value="contains">包含文字</option>
+      <option value="equals">等于</option>
+      <option value="empty">为空</option>
+      <option value="not-empty">不为空</option>
+    </select>
+    <label id="filter-value-label" for="filter-value">筛选值（不区分大小写）</label>
+    <input id="filter-value" type="text" autocomplete="off" placeholder="输入要查找的内容">
+    <div class="filter-actions">
+      <button id="clear-filter" class="secondary" type="button">清除此列</button>
+      <button type="submit">应用筛选</button>
+    </div>
+  </form>
+  <div id="drop-hint" aria-hidden="true">松开文件，立即导入</div>
+  <script>
+    const fileInput = document.getElementById('file');
+    const importButton = document.getElementById('import');
+    const table = document.getElementById('table');
+    const pathInput = document.getElementById('path');
+    const pathButton = document.getElementById('load-path');
+    const pathForm = document.getElementById('path-form');
+    const localToken = document.querySelector('meta[name="local-file-token"]').content;
+    const errorBox = document.getElementById('error');
+    const resetButton = document.getElementById('reset-view');
+    const filterPanel = document.getElementById('column-filter');
+    const filterMode = document.getElementById('filter-mode');
+    const filterValue = document.getElementById('filter-value');
+    const filters = new Map();
+    const headings = new Map();
+    const columnState = new Map();
+    const columnsButton = document.getElementById('columns-button');
+    const columnsPanel = document.getElementById('column-settings');
+    const displayMode = document.getElementById('display-mode');
+    const detail = document.getElementById('cell-detail');
+    const collator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' });
+    let loadedData = null;
+    let sort = null;
+    let filterColumn = null;
+    let filterTrigger = null;
+    let loading = false;
+
+    pathForm.hidden = !/^[a-f0-9]{64}$/.test(localToken);
+    pathInput.addEventListener('input', () => { pathButton.disabled = loading || !pathInput.value.trim(); });
+    pathForm.addEventListener('submit', event => {
+      event.preventDefault();
+      if (pathForm.hidden || !pathInput.value.trim()) return;
+      const path = pathInput.value;
+      importData(async () => {
+        let response;
+        try {
+          response = await fetch('/api/read-file', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Local-Token': localToken },
+            body: JSON.stringify({ path }), signal: AbortSignal.timeout(15000)
+          });
+        } catch { throw new Error('本地读取服务未响应，请确认它仍在运行后重试。'); }
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || '文件读取失败，请重试。');
+        return { text: result.text, name: result.path, path: result.path };
+      });
+    });
+
+    function showError(message) {
+      errorBox.textContent = message;
+      errorBox.hidden = false;
+    }
+
+    function validate(data) {
+      if (!data || typeof data !== 'object' || Array.isArray(data) ||
+          !Array.isArray(data.columns) || !Array.isArray(data.rows)) {
+        throw new Error('JSON 必须是包含 columns 数组和 rows 数组的对象。');
+      }
+      if (!data.columns.length || data.columns.some(column => typeof column !== 'string' || !column.trim())) {
+        throw new Error('columns 必须包含至少一个非空字符串列名。');
+      }
+      if (new Set(data.columns).size !== data.columns.length) {
+        throw new Error('columns 中不能有重复列名。');
+      }
+      data.rows.forEach((row, index) => {
+        if (!row || typeof row !== 'object' || Array.isArray(row) ||
+            Object.keys(row).length !== data.columns.length ||
+            data.columns.some(column => !Object.prototype.hasOwnProperty.call(row, column))) {
+          throw new Error(`rows 的第 ${index + 1} 行必须是对象，且字段需与 columns 中的列名一致。`);
+        }
+      });
+    }
+
+    function cellText(value) {
+      return typeof value === 'string' ? value : JSON.stringify(value);
+    }
+
+    function isEmpty(value) { return value === null || cellText(value).trim() === ''; }
+
+    function textWidth(text) {
+      return Array.from(text).reduce((width, char) => width + (char.codePointAt(0) > 255 ? 14 : 7), 0);
+    }
+
+    function estimateWidth(column, maximum = 360) {
+      const widths = [];
+      const count = Math.min(100, loadedData.rows.length);
+      for (let i = 0; i < count; i++) {
+        const row = loadedData.rows[Math.floor(i * loadedData.rows.length / count)];
+        const lines = cellText(row[column]).slice(0, 512).split('\n');
+        widths.push(Math.max(...lines.map(textWidth)));
+      }
+      widths.sort((a, b) => a - b);
+      const content = widths[Math.floor((widths.length - 1) * .9)] || 0;
+      return Math.min(maximum, Math.max(120, textWidth(column) + 72, content + 24));
+    }
+
+    function displayColumns() {
+      const visible = loadedData.columns.filter(column => columnState.get(column).visible);
+      return [...visible.filter(column => columnState.get(column).pinned), ...visible.filter(column => !columnState.get(column).pinned)];
+    }
+
+    function setColumnWidth(column, width) {
+      columnState.get(column).width = Math.max(96, Math.min(1200, Math.round(width)));
+      applyLayout();
+    }
+
+    function applyLayout() {
+      const columns = displayColumns();
+      table.style.width = `${columns.reduce((sum, column) => sum + columnState.get(column).width, 0)}px`;
+      for (const column of columns) headings.get(column).cell.style.width = `${columnState.get(column).width}px`;
+      let left = 0;
+      const lastPinned = columns.filter(column => columnState.get(column).pinned).at(-1);
+      for (const column of columns) {
+        const state = columnState.get(column);
+        const heading = headings.get(column);
+        const cells = [heading.cell, ...(heading.bodyCells || [])];
+        for (const cell of cells) {
+          cell.classList.toggle('pinned', state.pinned);
+          cell.classList.toggle('pin-edge', column === lastPinned);
+          cell.style.left = state.pinned ? `${left}px` : '';
+        }
+        const width = heading.cell.offsetWidth || state.width;
+        heading.resizeHandle.setAttribute('aria-valuenow', String(Math.round(width)));
+        if (state.pinned) left += width;
+      }
+      document.getElementById('table-wrap').style.scrollPaddingLeft = `${left}px`;
+      for (const column of columns) {
+        for (const cell of headings.get(column).bodyCells || []) {
+          const [content, expand] = cell.children;
+          if (expand) expand.hidden = content.scrollHeight <= content.clientHeight + 1;
+        }
+      }
+    }
+
+    function addResizeHandle(column, cell) {
+      const handle = document.createElement('div');
+      handle.className = 'resize-handle';
+      handle.tabIndex = 0;
+      handle.setAttribute('role', 'separator');
+      handle.setAttribute('aria-orientation', 'vertical');
+      handle.setAttribute('aria-label', `调整列宽：${column}`);
+      handle.setAttribute('aria-valuemin', '96');
+      handle.setAttribute('aria-valuemax', '1200');
+      handle.title = '拖动调整列宽，双击适配内容；方向键也可调整';
+      let drag = null;
+      handle.addEventListener('pointerdown', event => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        drag = { x: event.clientX, width: cell.offsetWidth || columnState.get(column).width };
+        handle.setPointerCapture(event.pointerId);
+      });
+      handle.addEventListener('pointermove', event => {
+        if (drag) setColumnWidth(column, drag.width + event.clientX - drag.x);
+      });
+      const finish = () => { if (drag) { drag = null; updateView(); } };
+      handle.addEventListener('pointerup', finish);
+      handle.addEventListener('pointercancel', finish);
+      handle.addEventListener('dblclick', () => { setColumnWidth(column, estimateWidth(column, 600)); updateView(); });
+      handle.addEventListener('keydown', event => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home'].includes(event.key)) return;
+        event.preventDefault();
+        setColumnWidth(column, event.key === 'Home' ? estimateWidth(column) : (cell.offsetWidth || columnState.get(column).width) + (event.key === 'ArrowLeft' ? -20 : 20));
+        updateView();
+      });
+      cell.append(handle);
+      return handle;
+    }
+
+    function refreshColumns() {
+      const columns = displayColumns();
+      table.tHead.rows[0].replaceChildren(...columns.map(column => headings.get(column).cell));
+      updateView();
+      renderColumnSettings();
+    }
+
+    function setColumnVisible(column, visible) {
+      if (!visible && displayColumns().length === 1) return;
+      columnState.get(column).visible = visible;
+      refreshColumns();
+    }
+
+    function renderColumnSettings() {
+      const list = document.getElementById('columns-list');
+      const query = document.getElementById('columns-search').value.toLocaleLowerCase();
+      const matches = loadedData.columns.filter(column => column.toLocaleLowerCase().includes(query));
+      list.replaceChildren();
+      for (const column of matches) {
+        const state = columnState.get(column);
+        const row = document.createElement('div');
+        row.className = 'column-option';
+        const label = document.createElement('label');
+        const show = document.createElement('input');
+        show.type = 'checkbox';
+        show.checked = state.visible;
+        show.disabled = state.visible && displayColumns().length === 1;
+        show.setAttribute('aria-label', `显示列：${column}`);
+        show.addEventListener('change', () => setColumnVisible(column, show.checked));
+        const name = document.createElement('span');
+        name.textContent = column + (filters.has(column) ? '（已筛选）' : '');
+        name.title = column;
+        label.append(show, name);
+        const pinLabel = document.createElement('label');
+        const pin = document.createElement('input');
+        pin.type = 'checkbox';
+        pin.checked = state.pinned;
+        pin.setAttribute('aria-label', `冻结列：${column}`);
+        pin.addEventListener('change', () => { state.pinned = pin.checked; refreshColumns(); });
+        const pinText = document.createElement('span');
+        pinText.textContent = '冻结';
+        pinLabel.append(pin, pinText);
+        row.append(label, pinLabel);
+        list.append(row);
+      }
+      if (!matches.length) list.textContent = '没有匹配的列';
+    }
+
+    columnsButton.addEventListener('click', () => {
+      document.getElementById('columns-search').value = '';
+      renderColumnSettings();
+    });
+    columnsPanel.addEventListener('toggle', event => {
+      if (event.newState !== 'open') return;
+      const rect = columnsButton.getBoundingClientRect();
+      columnsPanel.style.left = `${Math.max(12, Math.min(rect.left, innerWidth - columnsPanel.offsetWidth - 12))}px`;
+      columnsPanel.style.top = `${Math.max(12, Math.min(rect.bottom + 6, innerHeight - columnsPanel.offsetHeight - 12))}px`;
+    });
+    document.getElementById('columns-search').addEventListener('input', renderColumnSettings);
+    document.getElementById('show-all-columns').addEventListener('click', () => {
+      for (const state of columnState.values()) state.visible = true;
+      refreshColumns();
+    });
+    document.getElementById('reset-widths').addEventListener('click', () => {
+      for (const [column, state] of columnState) state.width = estimateWidth(column);
+      updateView();
+    });
+    displayMode.addEventListener('change', updateView);
+    document.getElementById('close-detail').addEventListener('click', () => detail.close());
+
+    function showCellDetail(column, text) {
+      document.getElementById('detail-title').textContent = column;
+      document.getElementById('detail-text').textContent = text;
+      detail.showModal();
+    }
+
+    function visibleRows() {
+      const rows = loadedData.rows.filter(row => Array.from(filters).every(([column, condition]) => {
+        const value = row[column];
+        if (condition.mode === 'empty') return isEmpty(value);
+        if (condition.mode === 'not-empty') return !isEmpty(value);
+        const text = cellText(value).toLocaleLowerCase();
+        const query = condition.value.toLocaleLowerCase();
+        return condition.mode === 'equals' ? text === query : text.includes(query);
+      }));
+      if (sort) rows.sort((a, b) => {
+        const left = a[sort.column], right = b[sort.column];
+        if (isEmpty(left) || isEmpty(right)) return Number(isEmpty(left)) - Number(isEmpty(right));
+        const comparison = typeof left === 'number' && typeof right === 'number' ? left - right : collator.compare(cellText(left), cellText(right));
+        return sort.direction === 'ascending' ? comparison : -comparison;
+      });
+      return rows;
+    }
+
+    function cycleSort(column) {
+      sort = sort?.column !== column ? { column, direction: 'ascending' } :
+        sort.direction === 'ascending' ? { column, direction: 'descending' } : null;
+      updateView();
+    }
+
+    function updateFilterInput() {
+      const needsValue = filterMode.value === 'contains' || filterMode.value === 'equals';
+      filterValue.hidden = !needsValue;
+      document.getElementById('filter-value-label').hidden = !needsValue;
+    }
+
+    function openFilter(column, trigger) {
+      if (filterTrigger) filterTrigger.setAttribute('aria-expanded', 'false');
+      filterColumn = column;
+      filterTrigger = trigger;
+      const condition = filters.get(column);
+      filterMode.value = condition?.mode || 'contains';
+      filterValue.value = condition?.value || '';
+      document.getElementById('filter-title').textContent = `筛选：${column}`;
+      updateFilterInput();
+      filterPanel.showPopover({ source: trigger });
+      trigger.setAttribute('aria-expanded', 'true');
+      const rect = trigger.getBoundingClientRect();
+      filterPanel.style.left = `${Math.max(12, Math.min(rect.left, innerWidth - filterPanel.offsetWidth - 12))}px`;
+      filterPanel.style.top = `${Math.max(12, Math.min(rect.bottom + 6, innerHeight - filterPanel.offsetHeight - 12))}px`;
+      (filterValue.hidden ? filterMode : filterValue).focus();
+    }
+
+    filterMode.addEventListener('change', updateFilterInput);
+    filterPanel.addEventListener('toggle', event => {
+      if (event.newState === 'closed' && filterTrigger) filterTrigger.setAttribute('aria-expanded', 'false');
+    });
+    filterPanel.addEventListener('submit', event => {
+      event.preventDefault();
+      const value = filterValue.value.trim();
+      if (filterMode.value === 'contains' && !value) filters.delete(filterColumn);
+      else filters.set(filterColumn, { mode: filterMode.value, value });
+      updateView();
+      filterPanel.hidePopover();
+      filterTrigger.focus();
+    });
+    document.getElementById('clear-filter').addEventListener('click', () => {
+      filters.delete(filterColumn);
+      updateView();
+      filterPanel.hidePopover();
+      filterTrigger.focus();
+    });
+    resetButton.addEventListener('click', () => {
+      filters.clear();
+      sort = null;
+      filterPanel.hidePopover();
+      updateView();
+    });
+
+    function render(data) {
+      loadedData = data;
+      filters.clear();
+      headings.clear();
+      columnState.clear();
+      sort = null;
+      filterPanel.hidePopover();
+      columnsPanel.hidePopover();
+      detail.close();
+      const head = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      for (const column of data.columns) {
+        columnState.set(column, { width: estimateWidth(column), visible: true, pinned: false });
+        const cell = document.createElement('th');
+        cell.scope = 'col';
+        const heading = document.createElement('div');
+        heading.className = 'column-heading';
+        const sortButton = document.createElement('button');
+        sortButton.type = 'button';
+        sortButton.className = 'sort-button';
+        const label = document.createElement('span');
+        label.textContent = column;
+        label.title = column;
+        const mark = document.createElement('span');
+        mark.className = 'sort-mark';
+        mark.setAttribute('aria-hidden', 'true');
+        sortButton.append(label, mark);
+        sortButton.addEventListener('click', () => cycleSort(column));
+        const filterButton = document.createElement('button');
+        filterButton.type = 'button';
+        filterButton.className = 'filter-button';
+        filterButton.setAttribute('aria-label', `筛选：${column}`);
+        filterButton.setAttribute('aria-haspopup', 'dialog');
+        filterButton.setAttribute('aria-controls', 'column-filter');
+        filterButton.setAttribute('aria-expanded', 'false');
+        const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        icon.setAttribute('width', '16');
+        icon.setAttribute('height', '16');
+        icon.setAttribute('viewBox', '0 0 24 24');
+        icon.setAttribute('fill', 'none');
+        icon.setAttribute('stroke', 'currentColor');
+        icon.setAttribute('stroke-width', '1.6');
+        icon.setAttribute('aria-hidden', 'true');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', 'M4 5h16l-6 7v6l-4 2v-8z');
+        icon.append(path);
+        filterButton.append(icon);
+        filterButton.addEventListener('click', () => openFilter(column, filterButton));
+        heading.append(sortButton, filterButton);
+        cell.append(heading);
+        const resizeHandle = addResizeHandle(column, cell);
+        headings.set(column, { cell, sortButton, mark, filterButton, resizeHandle });
+        headerRow.append(cell);
+      }
+      head.append(headerRow);
+      table.replaceChildren(head, document.createElement('tbody'));
+      table.hidden = false;
+      columnsButton.hidden = false;
+      displayMode.hidden = false;
+      document.getElementById('empty').hidden = true;
+      updateView();
+    }
+
+    function updateView() {
+      const rows = visibleRows();
+      const columns = displayColumns();
+      const compact = displayMode.value !== 'full';
+      table.classList.toggle('compact', compact);
+      for (const [column, heading] of headings) {
+        heading.bodyCells = [];
+        const direction = sort?.column === column ? sort.direction : 'none';
+        heading.cell.setAttribute('aria-sort', direction);
+        heading.mark.textContent = direction === 'ascending' ? '↑' : direction === 'descending' ? '↓' : '↕';
+        const next = direction === 'none' ? '升序排列' : direction === 'ascending' ? '降序排列' : '恢复原始顺序';
+        heading.sortButton.setAttribute('aria-label', `${column}：${next}`);
+        heading.sortButton.title = `点击${next}`;
+        const condition = filters.get(column);
+        heading.filterButton.setAttribute('aria-pressed', String(Boolean(condition)));
+        heading.filterButton.title = condition ? `已筛选：${condition.mode === 'empty' ? '为空' : condition.mode === 'not-empty' ? '不为空' : (condition.mode === 'equals' ? '等于 ' : '包含 ') + condition.value}` : '筛选此列';
+      }
+      const body = document.createElement('tbody');
+      for (const row of rows) {
+        const tr = document.createElement('tr');
+        for (const column of columns) {
+          const cell = document.createElement('td');
+          const text = cellText(row[column]);
+          const content = document.createElement('div');
+          content.className = 'cell-text';
+          content.textContent = text;
+          cell.append(content);
+          if (compact) {
+            const expand = document.createElement('button');
+            expand.type = 'button';
+            expand.className = 'expand-cell';
+            expand.textContent = '查看全文';
+            expand.setAttribute('aria-label', `查看全文：${column}`);
+            expand.addEventListener('click', () => showCellDetail(column, text));
+            cell.append(expand);
+          }
+          headings.get(column).bodyCells.push(cell);
+          tr.append(cell);
+        }
+        body.append(tr);
+      }
+      if (!rows.length) {
+        const tr = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.colSpan = columns.length;
+        cell.className = 'no-rows';
+        cell.textContent = filters.size ? '没有符合筛选条件的行，可修改条件或重置筛选。' : '暂无数据';
+        tr.append(cell);
+        body.append(tr);
+      }
+      table.tBodies[0].replaceWith(body);
+      applyLayout();
+      const total = loadedData.rows.length.toLocaleString();
+      const columnCount = columns.length === loadedData.columns.length ? columns.length.toLocaleString() : `${columns.length.toLocaleString()} / ${loadedData.columns.length.toLocaleString()}`;
+      document.getElementById('count').textContent = `${filters.size ? `${rows.length.toLocaleString()} / ${total}` : total} 行 · ${columnCount} 列`;
+      resetButton.hidden = !sort && !filters.size;
+    }
+
+    importButton.addEventListener('click', () => fileInput.click());
+    async function importData(read) {
+      if (loading) return;
+      loading = true;
+      errorBox.hidden = true;
+      importButton.disabled = true;
+      pathButton.disabled = true;
+      pathInput.disabled = true;
+      resetButton.disabled = true;
+      columnsButton.disabled = true;
+      displayMode.disabled = true;
+      table.inert = true;
+      filterPanel.hidePopover();
+      columnsPanel.hidePopover();
+      const count = document.getElementById('count');
+      const previousCount = count.textContent;
+      count.textContent = '正在读取…';
+      table.setAttribute('aria-busy', 'true');
+      try {
+        const source = await read();
+        const text = source.text.replace(/^\uFEFF/, '');
+        let data;
+        try { data = JSON.parse(text); }
+        catch { throw new Error('文件不是有效的 JSON，请检查语法。'); }
+        validate(data);
+        render(data);
+        document.getElementById('filename').textContent = source.name.split(/[\\/]/).pop();
+        document.getElementById('filename').title = source.name;
+        pathInput.value = source.path || '';
+      } catch (error) {
+        count.textContent = previousCount;
+        showError(`导入失败：${error.message}${table.hidden ? '' : ' 当前表格仍保留上一次成功导入的数据。'}`);
+      } finally {
+        fileInput.value = '';
+        loading = false;
+        importButton.disabled = false;
+        pathButton.disabled = !pathInput.value.trim();
+        pathInput.disabled = false;
+        resetButton.disabled = false;
+        columnsButton.disabled = false;
+        displayMode.disabled = false;
+        table.inert = false;
+        table.setAttribute('aria-busy', 'false');
+      }
+    }
+    function importFile(file) {
+      if (!file) return;
+      return importData(async () => {
+        if (file.size > 20 * 1024 * 1024) throw new Error('文件超过 20 MB，请缩小文件后重试。');
+        return { text: await file.text(), name: file.name };
+      });
+    }
+    fileInput.addEventListener('change', () => importFile(fileInput.files[0]));
+
+    let dragDepth = 0;
+    document.addEventListener('dragenter', event => {
+      if (!Array.from(event.dataTransfer.types).includes('Files')) return;
+      event.preventDefault();
+      dragDepth++;
+      document.body.classList.add('dragging');
+    });
+    document.addEventListener('dragover', event => {
+      if (!Array.from(event.dataTransfer.types).includes('Files')) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = loading ? 'none' : 'copy';
+    });
+    document.addEventListener('dragleave', () => {
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (!dragDepth) document.body.classList.remove('dragging');
+    });
+    document.addEventListener('drop', event => {
+      dragDepth = 0;
+      document.body.classList.remove('dragging');
+      if (!Array.from(event.dataTransfer.types).includes('Files')) return;
+      event.preventDefault();
+      if (loading) return;
+      if (event.dataTransfer.files.length !== 1) {
+        showError('请每次拖入一个 JSON 文件。');
+        return;
+      }
+      importFile(event.dataTransfer.files[0]);
+    });
+  </script>
+</body>
+</html>

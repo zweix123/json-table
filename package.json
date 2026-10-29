@@ -7,7 +7,6 @@
     "node": ">=24"
   },
   "scripts": {
-    "start": "node server.mjs",
     "test": "node --test json-table.test.mjs"
   }
 }

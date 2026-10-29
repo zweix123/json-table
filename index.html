@@ -3,7 +3,6 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="local-file-token" content="">
   <title>JSON 表格</title>
   <style>
     :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; color: #263449; background: #f5f7fa; }
@@ -16,18 +15,12 @@
     button:disabled { opacity: .5; cursor: default; }
     button:focus-visible, input:focus-visible, select:focus-visible, .table-wrap:focus-visible { outline: 3px solid #90b5ff; outline-offset: 3px; }
     main { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 8px 12px 12px; }
-    .source { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
-    #path-form { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
-    .or { color: #67758a; font-size: 13px; }
-    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
-    #path { flex: 1; min-width: 0; width: 100%; height: 34px; border: 1px solid #bdc9da; border-radius: 6px; padding: 0 10px; color: #263449; background: #fff; font: 13px ui-monospace, "SFMono-Regular", Consolas, monospace; }
-    #path::placeholder { color: #788699; }
     .secondary { background: #fff; color: #263449; border: 1px solid #bdc9da; }
     .secondary:hover { background: #edf0f5; }
     #error { margin: 0 0 8px; padding: 8px 12px; border-left: 3px solid #b42318; background: #fff1f0; color: #912018; font-size: 14px; line-height: 1.6; }
     #drop-hint { position: fixed; inset: 12px; z-index: 3; display: grid; place-items: center; border: 2px dashed #285cce; border-radius: 8px; background: #edf4fff2; color: #214eaf; font-size: 20px; pointer-events: none; }
     body:not(.dragging) #drop-hint { display: none; }
-    .meta { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; max-width: 180px; color: #67758a; font-size: 12px; line-height: 1.3; }
+    .meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 0; max-width: 180px; margin-left: auto; color: #67758a; font-size: 12px; line-height: 1.3; }
     #filename { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     #count { white-space: nowrap; font-variant-numeric: tabular-nums; }
     .table-wrap { flex: 1; min-height: 0; overflow: auto; border: 1px solid #dfe5ed; border-radius: 6px; background: #fff; }
@@ -81,23 +74,15 @@
     tbody tr:last-child td { border-bottom: 0; }
     .no-rows { text-align: center; color: #758296; padding: 40px 18px; }
     [hidden] { display: none !important; }
-    @media (max-width: 760px) { header { flex-wrap: wrap; gap: 8px 12px; padding: 8px 12px; } .source { order: 3; flex-basis: 100%; } .meta { margin-left: auto; max-width: 60%; flex-direction: row; gap: 8px; min-width: 0; } #filename { min-width: 0; } .or { display: none; } }
-    @media (max-width: 480px) { button, #path { height: 44px; } .source { flex-wrap: wrap; gap: 8px; } #path-form { flex-basis: 100%; } main { padding: 6px 8px 8px; } th, td { padding: 8px 10px; } }
+    @media (max-width: 760px) { header { flex-wrap: wrap; gap: 8px 12px; padding: 8px 12px; } .meta { max-width: 100%; flex-direction: row; gap: 8px; } }
+    @media (max-width: 480px) { button { height: 44px; } main { padding: 6px 8px 8px; } th, td { padding: 8px 10px; } }
   </style>
 </head>
 <body>
   <header>
     <h1>JSON 表格</h1>
-    <section class="source" aria-label="导入 JSON 文件">
-      <button id="import" class="secondary" type="button">选择文件…</button>
-      <input id="file" type="file" accept=".json,application/json" hidden>
-      <form id="path-form" hidden>
-        <span class="or" aria-hidden="true">或</span>
-        <label class="sr-only" for="path">JSON 文件绝对路径</label>
-        <input id="path" type="text" placeholder="粘贴 JSON 文件的绝对路径" autocomplete="off" spellcheck="false" aria-describedby="error">
-        <button id="load-path" type="submit" disabled>导入</button>
-      </form>
-    </section>
+    <button id="import" class="secondary" type="button">选择文件…</button>
+    <input id="file" type="file" accept=".json,application/json" hidden>
     <button id="columns-button" class="secondary" type="button" popovertarget="column-settings" hidden>列设置</button>
     <select id="display-mode" aria-label="内容显示模式" hidden><option value="compact">紧凑显示</option><option value="full">完整显示</option></select>
     <button id="reset-view" class="secondary" type="button" hidden>重置排序与筛选</button>
@@ -109,7 +94,7 @@
   <main>
     <div id="error" role="alert" hidden></div>
     <div id="table-wrap" class="table-wrap" tabindex="0" role="region" aria-label="JSON 数据表格">
-      <div id="empty" class="empty"><strong>拖入 JSON 文件，查看表格</strong><span>支持 columns / rows 格式，最大 20 MB</span></div>
+      <div id="empty" class="empty"><strong>打开 JSON 文件，查看表格</strong><span>点击「选择文件」，或直接将文件拖入页面</span><span>支持 columns / rows 格式，最大 20 MB</span></div>
       <table id="table" aria-label="导入的 JSON 数据" hidden></table>
     </div>
   </main>
@@ -142,10 +127,6 @@
     const fileInput = document.getElementById('file');
     const importButton = document.getElementById('import');
     const table = document.getElementById('table');
-    const pathInput = document.getElementById('path');
-    const pathButton = document.getElementById('load-path');
-    const pathForm = document.getElementById('path-form');
-    const localToken = document.querySelector('meta[name="local-file-token"]').content;
     const errorBox = document.getElementById('error');
     const resetButton = document.getElementById('reset-view');
     const filterPanel = document.getElementById('column-filter');
@@ -164,26 +145,6 @@
     let filterColumn = null;
     let filterTrigger = null;
     let loading = false;
-
-    pathForm.hidden = !/^[a-f0-9]{64}$/.test(localToken);
-    pathInput.addEventListener('input', () => { pathButton.disabled = loading || !pathInput.value.trim(); });
-    pathForm.addEventListener('submit', event => {
-      event.preventDefault();
-      if (pathForm.hidden || !pathInput.value.trim()) return;
-      const path = pathInput.value;
-      importData(async () => {
-        let response;
-        try {
-          response = await fetch('/api/read-file', {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Local-Token': localToken },
-            body: JSON.stringify({ path }), signal: AbortSignal.timeout(15000)
-          });
-        } catch { throw new Error('本地读取服务未响应，请确认它仍在运行后重试。'); }
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || '文件读取失败，请重试。');
-        return { text: result.text, name: result.path, path: result.path };
-      });
-    });
 
     function showError(message) {
       errorBox.textContent = message;
@@ -576,13 +537,11 @@
     }
 
     importButton.addEventListener('click', () => fileInput.click());
-    async function importData(read) {
-      if (loading) return;
+    async function importFile(file) {
+      if (!file || loading) return;
       loading = true;
       errorBox.hidden = true;
       importButton.disabled = true;
-      pathButton.disabled = true;
-      pathInput.disabled = true;
       resetButton.disabled = true;
       columnsButton.disabled = true;
       displayMode.disabled = true;
@@ -594,16 +553,15 @@
       count.textContent = '正在读取…';
       table.setAttribute('aria-busy', 'true');
       try {
-        const source = await read();
-        const text = source.text.replace(/^\uFEFF/, '');
+        if (file.size > 20 * 1024 * 1024) throw new Error('文件超过 20 MB，请缩小文件后重试。');
+        const text = (await file.text()).replace(/^\uFEFF/, '');
         let data;
         try { data = JSON.parse(text); }
         catch { throw new Error('文件不是有效的 JSON，请检查语法。'); }
         validate(data);
         render(data);
-        document.getElementById('filename').textContent = source.name.split(/[\\/]/).pop();
-        document.getElementById('filename').title = source.name;
-        pathInput.value = source.path || '';
+        document.getElementById('filename').textContent = file.name;
+        document.getElementById('filename').title = file.name;
       } catch (error) {
         count.textContent = previousCount;
         showError(`导入失败：${error.message}${table.hidden ? '' : ' 当前表格仍保留上一次成功导入的数据。'}`);
@@ -611,8 +569,6 @@
         fileInput.value = '';
         loading = false;
         importButton.disabled = false;
-        pathButton.disabled = !pathInput.value.trim();
-        pathInput.disabled = false;
         resetButton.disabled = false;
         columnsButton.disabled = false;
         displayMode.disabled = false;
@@ -620,19 +576,13 @@
         table.setAttribute('aria-busy', 'false');
       }
     }
-    function importFile(file) {
-      if (!file) return;
-      return importData(async () => {
-        if (file.size > 20 * 1024 * 1024) throw new Error('文件超过 20 MB，请缩小文件后重试。');
-        return { text: await file.text(), name: file.name };
-      });
-    }
     fileInput.addEventListener('change', () => importFile(fileInput.files[0]));
 
     let dragDepth = 0;
     document.addEventListener('dragenter', event => {
       if (!Array.from(event.dataTransfer.types).includes('Files')) return;
       event.preventDefault();
+      if (loading) return;
       dragDepth++;
       document.body.classList.add('dragging');
     });
@@ -641,7 +591,8 @@
       event.preventDefault();
       event.dataTransfer.dropEffect = loading ? 'none' : 'copy';
     });
-    document.addEventListener('dragleave', () => {
+    document.addEventListener('dragleave', event => {
+      if (!Array.from(event.dataTransfer.types).includes('Files')) return;
       dragDepth = Math.max(0, dragDepth - 1);
       if (!dragDepth) document.body.classList.remove('dragging');
     });

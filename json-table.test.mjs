@@ -1,14 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, mkdir, rm, readFile, truncate } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
-import { createJSONTableServer, normalizePath } from './server.mjs';
 
 // A small DOM stand-in checks import state transitions without a browser dependency.
-function page(html, fetch) {
+function page(html) {
   const makeElement = () => ({
     value: '', textContent: '', hidden: false, children: [], events: {}, attributes: {}, style: {},
     addEventListener(type, handler) { this.events[type] = handler; },
@@ -20,7 +16,7 @@ function page(html, fetch) {
     get rows() { return this.children; },
     setAttribute(key, value) { this.attributes[key] = value; },
     click() { this.clicked = true; },
-    focus() {}, showPopover() {}, hidePopover() {}, close() { this.open = false; }, showModal() { this.open = true; },
+    focus() {}, showPopover() { this.open = true; }, hidePopover() { this.open = false; }, close() { this.open = false; }, showModal() { this.open = true; },
     classList: {
       values: new Set(),
       add(value) { this.values.add(value); }, remove(value) { this.values.delete(value); },
@@ -36,103 +32,27 @@ function page(html, fetch) {
   const get = id => { assert.ok(elements.has(id), id); return elements.get(id); };
   get('table').hidden = true;
   const document = {
-    ...makeElement(), body: makeElement(), getElementById: get, createElement: makeElement, createElementNS: makeElement,
-    querySelector: () => ({ content: html.match(/name="local-file-token" content="([^"]*)"/)[1] })
+    ...makeElement(), body: makeElement(), getElementById: get, createElement: makeElement, createElementNS: makeElement
   };
-  const context = vm.createContext({ document, fetch, AbortSignal });
+  const context = vm.createContext({ document });
   vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], context);
   return { get, document, context };
 }
 
-test('JSON table: real path reads and unified import behavior', async t => {
-  const directory = await mkdtemp(join(tmpdir(), 'json-table-'));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  const path = join(directory, '中文 表格.json');
+test('standalone JSON table file import behavior', async t => {
+  const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
   const data = { columns: ['名称', '数值'], rows: [{ 名称: '<img src=x onerror=alert(1)>', 数值: false }] };
-  await writeFile(path, '\uFEFF' + JSON.stringify(data));
-  const server = createJSONTableServer();
-  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
-  t.after(() => new Promise(resolve => server.close(resolve)));
-  const origin = `http://127.0.0.1:${server.address().port}`;
-  const htmlResponse = await fetch(origin);
-  const html = await htmlResponse.text();
-  const token = html.match(/name="local-file-token" content="([^"]+)"/)[1];
-  const request = (path, headers = {}) => fetch(`${origin}/api/read-file`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Local-Token': token, Origin: origin, ...headers },
-    body: JSON.stringify({ path })
-  });
-
-  await t.test('absolute paths, quotes, spaces and file URLs read the actual file', async () => {
-    for (const input of [path, `"${path}"`, `'${path}'`, pathToFileURL(path).href]) {
-      const response = await request(input);
-      assert.equal(response.status, 200);
-      const result = await response.json();
-      assert.equal(result.path, path);
-      assert.deepEqual(JSON.parse(result.text.replace(/^\uFEFF/, '')), data);
-    }
-    assert.throws(() => normalizePath('relative.json'), /绝对路径/);
-    assert.throws(() => normalizePath('/tmp/secrets.txt'), /\.json/);
-  });
-
-  await t.test('missing files, directories and oversized files have useful errors', async () => {
-    assert.match((await (await request(join(directory, 'missing.json'))).json()).error, /找不到文件/);
-    const folder = join(directory, 'folder.json');
-    await mkdir(folder);
-    assert.match((await (await request(folder)).json()).error, /不是普通文件/);
-    const large = join(directory, 'large.json');
-    await writeFile(large, '');
-    await truncate(large, 20 * 1024 * 1024 + 1);
-    assert.match((await (await request(large)).json()).error, /超过 20 MB/);
-  });
-
-  await t.test('foreign pages, invalid tokens and alternate hosts cannot read files', async () => {
-    for (const headers of [{ Origin: 'https://example.com' }, { 'X-Local-Token': '' }, { 'Sec-Fetch-Site': 'cross-site' }]) {
-      assert.equal((await request(path, headers)).status, 403);
-    }
-    const { request: httpRequest } = await import('node:http');
-    const status = await new Promise(resolve => {
-      const req = httpRequest(origin, { headers: { Host: 'attacker.invalid' } }, response => { response.resume(); resolve(response.statusCode); });
-      req.end();
-    });
-    assert.equal(status, 403);
-    assert.equal(htmlResponse.headers.get('access-control-allow-origin'), null);
-    assert.match(htmlResponse.headers.get('content-security-policy'), /frame-ancestors 'none'/);
-  });
-
-  const { get, document, context } = page(html, (url, options) => fetch(new URL(url, origin), options));
+  const { get, document, context } = page(html);
   const settle = async () => {
     for (let i = 0; i < 100 && vm.runInContext('loading', context); i++) await new Promise(resolve => setTimeout(resolve, 10));
     assert.equal(vm.runInContext('loading', context), false);
   };
-  await t.test('pasted path imports directly without opening the file picker', async () => {
-    assert.equal(get('path-form').hidden, false);
-    get('path').value = path;
-    get('path-form').events.submit({ preventDefault() {} });
-    await settle();
-    assert.equal(get('file').clicked, undefined);
-    assert.equal(get('table').hidden, false);
-    assert.equal(get('filename').textContent, '中文 表格.json');
-    assert.equal(get('filename').title, path);
-    assert.equal(get('count').textContent, '1 行 · 2 列');
-    assert.equal(get('table').children[1].children[0].children[0].children[0].textContent, data.rows[0].名称);
-  });
-  await t.test('failed path imports preserve the displayed table and allow retry', async () => {
-    const previous = get('table').children;
-    get('path').value = join(directory, 'missing.json');
-    get('path-form').events.submit({ preventDefault() {} });
-    await settle();
-    assert.equal(get('table').children, previous);
-    assert.match(get('error').textContent, /找不到文件/);
-    assert.equal(get('count').textContent, '1 行 · 2 列');
-    assert.equal(get('load-path').disabled, false);
-  });
   await t.test('file picker and drag/drop both import immediately', async () => {
     get('import').events.click();
     assert.equal(get('file').clicked, true);
     get('file').files = [new File([JSON.stringify(data)], 'chosen.json')];
     await get('file').events.change();
     assert.equal(get('filename').textContent, 'chosen.json');
-    assert.equal(get('path').value, '');
     assert.equal(get('error').hidden, true);
     const file = new File([JSON.stringify(data)], 'dropped.json');
     document.events.drop({ dataTransfer: { types: ['Files'], files: [file] }, preventDefault() {} });
@@ -153,11 +73,57 @@ test('JSON table: real path reads and unified import behavior', async t => {
     await vm.runInContext('importFile(file)', context);
     assert.equal(get('table').children[1].children[0].children[0].textContent, '暂无数据');
   });
-  await t.test('standalone HTML only offers working input methods', async () => {
-    const standalone = page(await readFile(new URL('./index.html', import.meta.url), 'utf8'));
-    assert.equal(standalone.get('path-form').hidden, true);
-    standalone.get('import').events.click();
-    assert.equal(standalone.get('file').clicked, true);
+  await t.test('BOM, oversized files and read failures preserve import behavior', async () => {
+    context.file = new File(['\uFEFF' + JSON.stringify(data)], '中文 表格.json');
+    await vm.runInContext('importFile(file)', context);
+    assert.equal(get('filename').textContent, '中文 表格.json');
+    assert.equal(get('count').textContent, '1 行 · 2 列');
+    assert.equal(get('table').tBodies[0].children[0].children[0].children[0].textContent, data.rows[0].名称);
+    const previous = get('table').children;
+    for (const file of [
+      { name: 'large.json', size: 20 * 1024 * 1024 + 1, text() { assert.fail('must reject before reading'); } },
+      { name: 'unreadable.json', size: 1, async text() { throw new Error('读取失败'); } }
+    ]) {
+      context.file = file;
+      await vm.runInContext('importFile(file)', context);
+      assert.equal(get('table').children, previous);
+      assert.equal(get('filename').textContent, '中文 表格.json');
+      assert.equal(get('count').textContent, '1 行 · 2 列');
+      assert.match(get('error').textContent, /仍保留/);
+      assert.equal(get('import').disabled, false);
+      assert.equal(get('table').inert, false);
+    }
+  });
+  await t.test('loading prevents simultaneous imports and permits retry', async () => {
+    let finishRead;
+    context.file = { name: 'slow.json', size: 1, text: () => new Promise(resolve => { finishRead = resolve; }) };
+    const pending = vm.runInContext('importFile(file)', context);
+    assert.equal(get('import').disabled, true);
+    assert.equal(get('table').inert, true);
+    context.file = { name: 'ignored.json', size: 1, text() { assert.fail('must ignore overlapping imports'); } };
+    await vm.runInContext('importFile(file)', context);
+    finishRead(JSON.stringify(data));
+    await pending;
+    assert.equal(get('filename').textContent, 'slow.json');
+    assert.equal(get('import').disabled, false);
+    assert.equal(get('table').attributes['aria-busy'], 'false');
+  });
+  await t.test('drag hints only appear for files and clear after leaving or dropping', async () => {
+    const event = types => ({ dataTransfer: { types }, preventDefault() {} });
+    const dragging = () => document.body.classList.contains('dragging');
+    document.events.dragenter(event(['text/plain']));
+    assert.equal(dragging(), false);
+    document.events.dragenter(event(['Files']));
+    document.events.dragenter(event(['Files']));
+    assert.equal(dragging(), true);
+    document.events.dragleave(event(['text/plain']));
+    document.events.dragleave(event(['Files']));
+    assert.equal(dragging(), true);
+    document.events.dragleave(event(['Files']));
+    assert.equal(dragging(), false);
+    document.events.dragenter(event(['Files']));
+    document.events.drop({ dataTransfer: { types: ['Files'], files: [] }, preventDefault() {} });
+    assert.equal(dragging(), false);
   });
 });
 

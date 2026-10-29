@@ -6,7 +6,9 @@
 
 1. 将 [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md) 复制到 Agent 的系统提示词中。
 2. 让 Agent 生成表格 JSON 文件。
-3. 用浏览器打开 [index.html](./index.html)，选择或拖入文件。
+3. 用浏览器直接打开 [index.html](./index.html)。
+
+点击顶部「选择文件…」，或直接将一个 JSON 文件拖到页面任意位置打开。无需启动服务。
 
 页面无需安装依赖，文件仅在本机处理，最大 20 MB。支持排序、多列筛选、调整列宽、隐藏和冻结列，以及查看单元格全文。
 
@@ -26,13 +28,10 @@
 
 ## 开发
 
-需要 Node.js 24+，无第三方依赖。
+运行测试需要 Node.js 24+，无第三方依赖。页面本身不需要 Node.js。
 
 ```sh
-npm start  # 启动本地服务：http://127.0.0.1:4329
 npm test   # 运行测试
 ```
 
-通过本地服务打开页面，还可粘贴 JSON 文件的绝对路径导入。
-
-所有文件放在根目录：`index.html` 是独立页面，`server.mjs` 是本地服务，`json-table.test.mjs` 是测试，`SYSTEM_PROMPT.md` 是用户提示词，`package.json` 定义命令。
+所有文件放在根目录：`index.html` 是独立页面，`json-table.test.mjs` 是测试，`SYSTEM_PROMPT.md` 是用户提示词，`package.json` 定义测试命令。

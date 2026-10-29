@@ -23,7 +23,8 @@
     .meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 0; max-width: 180px; margin-left: auto; color: #67758a; font-size: 12px; line-height: 1.3; }
     #filename { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     #count { white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .table-wrap { flex: 1; min-height: 0; overflow: auto; border: 1px solid #dfe5ed; border-radius: 6px; background: #fff; }
+    .table-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #dfe5ed; border-radius: 6px; background: #fff; }
+    .table-wrap { flex: 1; min-height: 0; overflow: auto; }
     .empty { height: 100%; min-height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; color: #758296; font-size: 14px; }
     .empty strong { color: #3b4c64; font-size: 17px; font-weight: 500; }
     table { table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 14px; line-height: 1.5; }
@@ -33,16 +34,6 @@
     .sort-button > span:first-child { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .resize-handle { position: absolute; top: 0; right: -1px; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; }
     .resize-handle:hover, .resize-handle:focus-visible { background: #90b5ff66; outline: 0; }
-    th.pinned { z-index: 2; }
-    td.pinned { position: sticky; z-index: 1; background: #fff; }
-    tbody tr:nth-child(even) td.pinned { background: #fafbfd; }
-    tbody tr:hover td.pinned { background: #edf4ff; }
-    .pin-edge { border-right: 2px solid #bdc9da; }
-    .cell-text { white-space: pre-wrap; overflow-wrap: anywhere; }
-    table.compact .cell-text { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-    .expand-cell { display: block; height: 22px; padding: 0; margin-top: 3px; background: transparent; color: #285cce; font-size: 12px; font-weight: 400; }
-    .expand-cell:hover { background: transparent; text-decoration: underline; }
-    #display-mode { height: 34px; max-width: 100px; padding: 0 8px; border: 1px solid #bdc9da; border-radius: 6px; background: #fff; color: #263449; font: inherit; font-size: 13px; }
     .sort-button { flex: 1; min-width: 0; height: auto; justify-content: flex-start; padding: 0; border-radius: 3px; background: transparent; color: inherit; font: inherit; text-align: left; white-space: normal; overflow-wrap: anywhere; }
     .sort-button:hover, .filter-button:hover { background: #e1e9f6; }
     .sort-mark { flex-shrink: 0; color: #67758a; font-size: 12px; }
@@ -51,23 +42,29 @@
     .filter-button[aria-pressed="true"] { background: #dae7ff; }
     #column-filter { position: fixed; inset: auto; margin: 0; width: min(300px, calc(100vw - 24px)); padding: 16px; border: 1px solid #bdc9da; border-radius: 8px; box-shadow: 0 6px 24px #26344926; color: #263449; background: #fff; font-size: 13px; }
     #column-filter h2 { margin: 0 0 14px; max-height: 84px; overflow: auto; font-size: 14px; overflow-wrap: anywhere; }
+    .filter-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+    #close-filter { flex-shrink: 0; height: 24px; padding: 0 6px; background: transparent; color: #67758a; }
     #column-filter label { display: block; margin: 12px 0 6px; }
     #column-filter input, #column-filter select { width: 100%; height: 34px; padding: 0 8px; border: 1px solid #bdc9da; border-radius: 5px; background: #fff; color: inherit; font: inherit; }
+    #column-filter { max-height: calc(100dvh - 24px); overflow: auto; }
+    #filter-options { max-height: 240px; overflow: auto; margin-top: 4px; }
+    #column-filter .filter-option { display: flex; align-items: center; gap: 8px; min-height: 36px; margin: 0; padding: 6px 4px; border-radius: 4px; cursor: pointer; }
+    #column-filter .filter-option:hover { background: #edf4ff; }
+    #column-filter .filter-option input { width: 16px; height: 16px; padding: 0; flex-shrink: 0; accent-color: #285cce; }
+    .filter-option span { min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+    .filter-option small { margin-left: auto; padding-left: 8px; color: #67758a; font-variant-numeric: tabular-nums; }
+    .filter-selection { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; color: #67758a; font-size: 12px; }
+    #select-filter-values { height: 28px; padding: 0; background: transparent; color: #285cce; font-size: 12px; }
+    #filter-error { margin: 8px 0 0; color: #b42318; }
+    #active-filters, #filter-chips { display: flex; align-items: center; gap: 8px; }
+    #active-filters { flex-shrink: 0; padding: 10px 12px; border-bottom: 1px solid #dfe5ed; background: #fff; }
+    .filter-label { flex-shrink: 0; color: #67758a; font-size: 12px; }
+    #filter-chips { flex: 1; min-width: 0; flex-wrap: wrap; }
+    .filter-chip { max-width: 100%; height: auto; min-height: 30px; padding: 4px 8px; border: 1px solid #c5d8ff; background: #edf4ff; color: #285cce; font-size: 12px; font-weight: 400; }
+    .filter-chip:hover { background: #dae7ff; }
+    .filter-chip span { min-width: 0; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #clear-all-filters { flex-shrink: 0; margin-left: auto; height: 30px; padding: 0 4px; color: #67758a; background: transparent; font-size: 12px; font-weight: 400; }
     .filter-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 16px; }
-    #column-settings { position: fixed; inset: auto; margin: 0; width: min(380px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; padding: 16px; border: 1px solid #bdc9da; border-radius: 8px; box-shadow: 0 6px 24px #26344926; background: #fff; color: #263449; font-size: 13px; }
-    #column-settings h2 { margin: 0 0 8px; font-size: 15px; }
-    #column-settings p { margin: 0 0 12px; color: #67758a; line-height: 1.6; }
-    #columns-search { width: 100%; height: 34px; padding: 0 8px; border: 1px solid #bdc9da; border-radius: 5px; font: inherit; }
-    #columns-list { max-height: 45dvh; overflow: auto; margin-top: 8px; }
-    .column-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #edf0f5; }
-    .column-option label { display: flex; align-items: center; gap: 6px; min-width: 0; }
-    .column-option label:first-child { flex: 1; }
-    .column-option span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .column-option input { flex-shrink: 0; accent-color: #285cce; }
-    #cell-detail { width: min(720px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 24px; border: 1px solid #bdc9da; border-radius: 8px; color: #263449; }
-    #cell-detail::backdrop { background: #26344966; }
-    #cell-detail h2 { margin: 0 0 16px; font-size: 16px; overflow-wrap: anywhere; }
-    #detail-text { max-height: 60dvh; overflow: auto; margin-bottom: 16px; font-size: 14px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
     th:last-child, td:last-child { border-right: 0; }
     tbody tr:nth-child(even) { background: #fafbfd; }
     tbody tr:hover { background: #edf4ff; }
@@ -83,9 +80,7 @@
     <h1>JSON 表格</h1>
     <button id="import" class="secondary" type="button">选择文件…</button>
     <input id="file" type="file" accept=".json,application/json" hidden>
-    <button id="columns-button" class="secondary" type="button" popovertarget="column-settings" hidden>列设置</button>
-    <select id="display-mode" aria-label="内容显示模式" hidden><option value="compact">紧凑显示</option><option value="full">完整显示</option></select>
-    <button id="reset-view" class="secondary" type="button" hidden>重置排序与筛选</button>
+    <button id="reset-view" class="secondary" type="button" hidden>重置排序</button>
     <div class="meta" role="status" aria-live="polite">
       <span id="filename">尚未打开文件</span>
       <span id="count"></span>
@@ -93,30 +88,42 @@
   </header>
   <main>
     <div id="error" role="alert" hidden></div>
-    <div id="table-wrap" class="table-wrap" tabindex="0" role="region" aria-label="JSON 数据表格">
-      <div id="empty" class="empty"><strong>打开 JSON 文件，查看表格</strong><span>点击「选择文件」，或直接将文件拖入页面</span><span>支持 columns / rows 格式，最大 20 MB</span></div>
-      <table id="table" aria-label="导入的 JSON 数据" hidden></table>
+    <div class="table-panel">
+      <div id="active-filters" aria-label="当前筛选" hidden>
+        <span class="filter-label">已筛选</span>
+        <div id="filter-chips"></div>
+        <button id="clear-all-filters" type="button">清空筛选</button>
+      </div>
+      <div id="table-wrap" class="table-wrap" tabindex="0" role="region" aria-label="JSON 数据表格">
+        <div id="empty" class="empty"><strong>打开 JSON 文件，查看表格</strong><span>点击「选择文件」，或直接将文件拖入页面</span><span>支持 columns / rows 格式，最大 20 MB</span></div>
+        <table id="table" aria-label="导入的 JSON 数据" hidden></table>
+      </div>
     </div>
   </main>
-  <section id="column-settings" popover aria-labelledby="columns-title">
-    <h2 id="columns-title">列设置</h2>
-    <p>勾选显示列，冻结列显示在左侧。隐藏列的筛选仍然生效。</p>
-    <input id="columns-search" type="search" aria-label="搜索列名" placeholder="搜索列名">
-    <div id="columns-list"></div>
-    <div class="filter-actions"><button id="show-all-columns" class="secondary" type="button">显示全部列</button><button id="reset-widths" class="secondary" type="button">重置列宽</button></div>
-  </section>
-  <dialog id="cell-detail" aria-labelledby="detail-title"><h2 id="detail-title"></h2><div id="detail-text" tabindex="0"></div><button id="close-detail" type="button">关闭</button></dialog>
   <form id="column-filter" popover role="dialog" aria-labelledby="filter-title">
-    <h2 id="filter-title"></h2>
-    <label for="filter-mode">筛选条件</label>
-    <select id="filter-mode">
-      <option value="contains">包含文字</option>
-      <option value="equals">等于</option>
-      <option value="empty">为空</option>
-      <option value="not-empty">不为空</option>
-    </select>
-    <label id="filter-value-label" for="filter-value">筛选值（不区分大小写）</label>
+    <div class="filter-heading"><h2 id="filter-title"></h2><button id="close-filter" type="button" aria-label="关闭筛选">×</button></div>
+    <div id="number-filter" hidden>
+      <label for="number-mode">比较方式</label>
+      <select id="number-mode">
+        <option value="equals">等于</option>
+        <option value="gte">大于等于</option>
+        <option value="gt">大于</option>
+        <option value="lte">小于等于</option>
+        <option value="lt">小于</option>
+        <option value="between">介于</option>
+      </select>
+    </div>
+    <div id="filter-values" hidden>
+      <label for="filter-search">搜索候选值</label>
+      <input id="filter-search" type="search" autocomplete="off" placeholder="搜索候选值…">
+      <div class="filter-selection"><button id="select-filter-values" type="button">全选搜索结果</button><span id="filter-selected" role="status" aria-live="polite"></span></div>
+      <div id="filter-options"></div>
+    </div>
+    <label id="filter-value-label" for="filter-value">包含关键词（不区分大小写）</label>
     <input id="filter-value" type="text" autocomplete="off" placeholder="输入要查找的内容">
+    <label id="filter-upper-label" for="filter-upper" hidden>最大值（含）</label>
+    <input id="filter-upper" type="number" step="any" placeholder="输入最大值" hidden>
+    <p id="filter-error" role="alert" hidden></p>
     <div class="filter-actions">
       <button id="clear-filter" class="secondary" type="button">清除此列</button>
       <button type="submit">应用筛选</button>
@@ -130,20 +137,20 @@
     const errorBox = document.getElementById('error');
     const resetButton = document.getElementById('reset-view');
     const filterPanel = document.getElementById('column-filter');
-    const filterMode = document.getElementById('filter-mode');
+    const numberMode = document.getElementById('number-mode');
     const filterValue = document.getElementById('filter-value');
+    const filterUpper = document.getElementById('filter-upper');
+    const filterSearch = document.getElementById('filter-search');
+    const activeFilters = document.getElementById('active-filters');
     const filters = new Map();
     const headings = new Map();
     const columnState = new Map();
-    const columnsButton = document.getElementById('columns-button');
-    const columnsPanel = document.getElementById('column-settings');
-    const displayMode = document.getElementById('display-mode');
-    const detail = document.getElementById('cell-detail');
     const collator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' });
     let loadedData = null;
     let sort = null;
     let filterColumn = null;
     let filterTrigger = null;
+    let draftValues = new Set();
     let loading = false;
 
     function showError(message) {
@@ -177,6 +184,68 @@
 
     function isEmpty(value) { return value === null || cellText(value).trim() === ''; }
 
+    function valueKey(value) { return `${typeof value}:${JSON.stringify(value)}`; }
+
+    function valueLabel(value) {
+      if (value === null) return '（空值 · null）';
+      if (value === '') return '（空字符串）';
+      if (typeof value === 'boolean') return value ? '是 · true' : '否 · false';
+      if (typeof value === 'number') return `${value} · 数字`;
+      return value.trim() ? value : JSON.stringify(value);
+    }
+
+    function inspectColumn(column) {
+      let numeric = true, hasNumber = false, selectable = true;
+      const values = new Map();
+      for (const row of loadedData.rows) {
+        const value = row[column];
+        if (value !== null) {
+          numeric &&= typeof value === 'number';
+          hasNumber ||= typeof value === 'number';
+        }
+        if (!selectable) continue;
+        // Long text and high-cardinality columns are easier to filter by a condition.
+        if ((value !== null && typeof value === 'object') || (typeof value === 'string' && value.length > 120)) selectable = false;
+        else values.set(valueKey(value), value);
+        if (values.size > 100) selectable = false;
+        if (!selectable) values.clear();
+      }
+      return { numeric: numeric && hasNumber, values: selectable && values.size ? values : null };
+    }
+
+    function matchesFilters(row, omittedColumn) {
+      for (const [column, condition] of filters) {
+        if (column === omittedColumn) continue;
+        const value = row[column];
+        let matches;
+        if (condition.mode === 'values') matches = condition.keys.has(valueKey(value));
+        else if (typeof condition.value === 'number') {
+          matches = typeof value === 'number' && (
+            condition.mode === 'gte' ? value >= condition.value :
+            condition.mode === 'gt' ? value > condition.value :
+            condition.mode === 'lte' ? value <= condition.value :
+            condition.mode === 'lt' ? value < condition.value :
+            condition.mode === 'between' ? value >= condition.value && value <= condition.upper : value === condition.value);
+        } else {
+          const text = cellText(value).toLocaleLowerCase();
+          const query = condition.value.toLocaleLowerCase();
+          matches = text.includes(query);
+        }
+        if (!matches) return false;
+      }
+      return true;
+    }
+
+    function filterDescription(column, condition) {
+      if (condition.mode === 'values') {
+        const values = columnState.get(column).values;
+        return Array.from(condition.keys, key => valueLabel(values.get(key))).join('、') || '未选择任何值';
+      }
+      if (condition.mode === 'between') return `${condition.value} ～ ${condition.upper}（含边界）`;
+      const prefix = { contains: '包含 ', equals: '等于 ', gt: '> ', gte: '≥ ', lt: '< ', lte: '≤ ' };
+      return prefix[condition.mode] + condition.value;
+    }
+
     function textWidth(text) {
       return Array.from(text).reduce((width, char) => width + (char.codePointAt(0) > 255 ? 14 : 7), 0);
     }
@@ -194,41 +263,17 @@
       return Math.min(maximum, Math.max(120, textWidth(column) + 72, content + 24));
     }
 
-    function displayColumns() {
-      const visible = loadedData.columns.filter(column => columnState.get(column).visible);
-      return [...visible.filter(column => columnState.get(column).pinned), ...visible.filter(column => !columnState.get(column).pinned)];
-    }
-
     function setColumnWidth(column, width) {
       columnState.get(column).width = Math.max(96, Math.min(1200, Math.round(width)));
       applyLayout();
     }
 
     function applyLayout() {
-      const columns = displayColumns();
-      table.style.width = `${columns.reduce((sum, column) => sum + columnState.get(column).width, 0)}px`;
-      for (const column of columns) headings.get(column).cell.style.width = `${columnState.get(column).width}px`;
-      let left = 0;
-      const lastPinned = columns.filter(column => columnState.get(column).pinned).at(-1);
-      for (const column of columns) {
-        const state = columnState.get(column);
+      table.style.width = `${loadedData.columns.reduce((sum, column) => sum + columnState.get(column).width, 0)}px`;
+      for (const column of loadedData.columns) {
         const heading = headings.get(column);
-        const cells = [heading.cell, ...(heading.bodyCells || [])];
-        for (const cell of cells) {
-          cell.classList.toggle('pinned', state.pinned);
-          cell.classList.toggle('pin-edge', column === lastPinned);
-          cell.style.left = state.pinned ? `${left}px` : '';
-        }
-        const width = heading.cell.offsetWidth || state.width;
-        heading.resizeHandle.setAttribute('aria-valuenow', String(Math.round(width)));
-        if (state.pinned) left += width;
-      }
-      document.getElementById('table-wrap').style.scrollPaddingLeft = `${left}px`;
-      for (const column of columns) {
-        for (const cell of headings.get(column).bodyCells || []) {
-          const [content, expand] = cell.children;
-          if (expand) expand.hidden = content.scrollHeight <= content.clientHeight + 1;
-        }
+        heading.cell.style.width = `${columnState.get(column).width}px`;
+        heading.resizeHandle.setAttribute('aria-valuenow', String(Math.round(heading.cell.offsetWidth || columnState.get(column).width)));
       }
     }
 
@@ -266,91 +311,8 @@
       return handle;
     }
 
-    function refreshColumns() {
-      const columns = displayColumns();
-      table.tHead.rows[0].replaceChildren(...columns.map(column => headings.get(column).cell));
-      updateView();
-      renderColumnSettings();
-    }
-
-    function setColumnVisible(column, visible) {
-      if (!visible && displayColumns().length === 1) return;
-      columnState.get(column).visible = visible;
-      refreshColumns();
-    }
-
-    function renderColumnSettings() {
-      const list = document.getElementById('columns-list');
-      const query = document.getElementById('columns-search').value.toLocaleLowerCase();
-      const matches = loadedData.columns.filter(column => column.toLocaleLowerCase().includes(query));
-      list.replaceChildren();
-      for (const column of matches) {
-        const state = columnState.get(column);
-        const row = document.createElement('div');
-        row.className = 'column-option';
-        const label = document.createElement('label');
-        const show = document.createElement('input');
-        show.type = 'checkbox';
-        show.checked = state.visible;
-        show.disabled = state.visible && displayColumns().length === 1;
-        show.setAttribute('aria-label', `显示列：${column}`);
-        show.addEventListener('change', () => setColumnVisible(column, show.checked));
-        const name = document.createElement('span');
-        name.textContent = column + (filters.has(column) ? '（已筛选）' : '');
-        name.title = column;
-        label.append(show, name);
-        const pinLabel = document.createElement('label');
-        const pin = document.createElement('input');
-        pin.type = 'checkbox';
-        pin.checked = state.pinned;
-        pin.setAttribute('aria-label', `冻结列：${column}`);
-        pin.addEventListener('change', () => { state.pinned = pin.checked; refreshColumns(); });
-        const pinText = document.createElement('span');
-        pinText.textContent = '冻结';
-        pinLabel.append(pin, pinText);
-        row.append(label, pinLabel);
-        list.append(row);
-      }
-      if (!matches.length) list.textContent = '没有匹配的列';
-    }
-
-    columnsButton.addEventListener('click', () => {
-      document.getElementById('columns-search').value = '';
-      renderColumnSettings();
-    });
-    columnsPanel.addEventListener('toggle', event => {
-      if (event.newState !== 'open') return;
-      const rect = columnsButton.getBoundingClientRect();
-      columnsPanel.style.left = `${Math.max(12, Math.min(rect.left, innerWidth - columnsPanel.offsetWidth - 12))}px`;
-      columnsPanel.style.top = `${Math.max(12, Math.min(rect.bottom + 6, innerHeight - columnsPanel.offsetHeight - 12))}px`;
-    });
-    document.getElementById('columns-search').addEventListener('input', renderColumnSettings);
-    document.getElementById('show-all-columns').addEventListener('click', () => {
-      for (const state of columnState.values()) state.visible = true;
-      refreshColumns();
-    });
-    document.getElementById('reset-widths').addEventListener('click', () => {
-      for (const [column, state] of columnState) state.width = estimateWidth(column);
-      updateView();
-    });
-    displayMode.addEventListener('change', updateView);
-    document.getElementById('close-detail').addEventListener('click', () => detail.close());
-
-    function showCellDetail(column, text) {
-      document.getElementById('detail-title').textContent = column;
-      document.getElementById('detail-text').textContent = text;
-      detail.showModal();
-    }
-
     function visibleRows() {
-      const rows = loadedData.rows.filter(row => Array.from(filters).every(([column, condition]) => {
-        const value = row[column];
-        if (condition.mode === 'empty') return isEmpty(value);
-        if (condition.mode === 'not-empty') return !isEmpty(value);
-        const text = cellText(value).toLocaleLowerCase();
-        const query = condition.value.toLocaleLowerCase();
-        return condition.mode === 'equals' ? text === query : text.includes(query);
-      }));
+      const rows = loadedData.rows.filter(row => matchesFilters(row));
       if (sort) rows.sort((a, b) => {
         const left = a[sort.column], right = b[sort.column];
         if (isEmpty(left) || isEmpty(right)) return Number(isEmpty(left)) - Number(isEmpty(right));
@@ -366,38 +328,143 @@
       updateView();
     }
 
-    function updateFilterInput() {
-      const needsValue = filterMode.value === 'contains' || filterMode.value === 'equals';
-      filterValue.hidden = !needsValue;
-      document.getElementById('filter-value-label').hidden = !needsValue;
+    function currentFilterMode() {
+      const state = columnState.get(filterColumn);
+      return state.numeric ? numberMode.value : state.values ? 'values' : 'contains';
     }
 
+    function updateFilterInput() {
+      const mode = currentFilterMode();
+      const needsValue = mode !== 'values';
+      const numeric = columnState.get(filterColumn).numeric;
+      document.getElementById('number-filter').hidden = !numeric;
+      numberMode.disabled = !numeric;
+      document.getElementById('filter-values').hidden = mode !== 'values';
+      filterValue.hidden = !needsValue;
+      filterValue.disabled = !needsValue;
+      filterValue.type = numeric ? 'number' : 'text';
+      filterValue.step = 'any';
+      filterValue.placeholder = numeric ? '输入数值' : '输入关键词…';
+      document.getElementById('filter-value-label').textContent = mode === 'between' ? '最小值（含）' : numeric ? '筛选值' : '包含关键词（不区分大小写）';
+      document.getElementById('filter-value-label').hidden = !needsValue;
+      filterUpper.hidden = mode !== 'between';
+      filterUpper.disabled = mode !== 'between';
+      document.getElementById('filter-upper-label').hidden = mode !== 'between';
+      document.getElementById('filter-error').hidden = true;
+      if (mode === 'values') renderFilterOptions();
+      positionFilter();
+    }
+
+    function positionFilter() {
+      const rect = filterTrigger.getBoundingClientRect();
+      filterPanel.style.left = `${Math.max(12, Math.min(rect.left, innerWidth - filterPanel.offsetWidth - 12))}px`;
+      filterPanel.style.top = `${Math.max(12, Math.min(rect.bottom + 6, innerHeight - filterPanel.offsetHeight - 12))}px`;
+    }
+
+    function searchedValues() {
+      const query = filterSearch.value.toLocaleLowerCase();
+      return Array.from(columnState.get(filterColumn).values).filter(([, value]) => valueLabel(value).toLocaleLowerCase().includes(query));
+    }
+
+    function updateSelectionCount() {
+      document.getElementById('filter-selected').textContent = `已选 ${draftValues.size} 项`;
+      const shown = searchedValues();
+      const selectAll = document.getElementById('select-filter-values');
+      selectAll.disabled = !shown.length;
+      selectAll.textContent = shown.length && shown.every(([key]) => draftValues.has(key)) ? '取消全选搜索结果' : '全选搜索结果';
+    }
+
+    function renderFilterOptions() {
+      const options = document.getElementById('filter-options');
+      options.replaceChildren();
+      for (const [key, value] of searchedValues()) {
+        const label = document.createElement('label');
+        label.className = 'filter-option';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = draftValues.has(key);
+        checkbox.addEventListener('change', () => {
+          if (checkbox.checked) draftValues.add(key);
+          else draftValues.delete(key);
+          updateSelectionCount();
+        });
+        const text = document.createElement('span');
+        text.textContent = valueLabel(value);
+        const count = document.createElement('small');
+        count.textContent = String(facetCounts.get(key) || 0);
+        label.append(checkbox, text, count);
+        options.append(label);
+      }
+      if (!options.children.length) options.textContent = '没有匹配的候选值';
+      updateSelectionCount();
+    }
+
+    let facetCounts = new Map();
     function openFilter(column, trigger) {
       if (filterTrigger) filterTrigger.setAttribute('aria-expanded', 'false');
       filterColumn = column;
       filterTrigger = trigger;
       const condition = filters.get(column);
-      filterMode.value = condition?.mode || 'contains';
-      filterValue.value = condition?.value || '';
+      const state = columnState.get(column);
+      if (state.numeric) numberMode.value = condition?.mode || 'gte';
+      draftValues = new Set(condition?.mode === 'values' ? condition.keys : state.values?.keys());
+      facetCounts = new Map();
+      if (!state.numeric && state.values) for (const row of loadedData.rows) {
+        if (!matchesFilters(row, column)) continue;
+        const key = valueKey(row[column]);
+        facetCounts.set(key, (facetCounts.get(key) || 0) + 1);
+      }
+      filterSearch.value = '';
       document.getElementById('filter-title').textContent = `筛选：${column}`;
-      updateFilterInput();
       filterPanel.showPopover({ source: trigger });
       trigger.setAttribute('aria-expanded', 'true');
-      const rect = trigger.getBoundingClientRect();
-      filterPanel.style.left = `${Math.max(12, Math.min(rect.left, innerWidth - filterPanel.offsetWidth - 12))}px`;
-      filterPanel.style.top = `${Math.max(12, Math.min(rect.bottom + 6, innerHeight - filterPanel.offsetHeight - 12))}px`;
-      (filterValue.hidden ? filterMode : filterValue).focus();
+      updateFilterInput();
+      filterValue.value = condition?.value ?? '';
+      filterUpper.value = condition?.upper ?? '';
+      (currentFilterMode() === 'values' ? filterSearch : filterValue).focus();
     }
 
-    filterMode.addEventListener('change', updateFilterInput);
+    numberMode.addEventListener('change', updateFilterInput);
+    filterSearch.addEventListener('input', renderFilterOptions);
+    document.getElementById('select-filter-values').addEventListener('click', () => {
+      const shown = searchedValues();
+      const remove = shown.every(([key]) => draftValues.has(key));
+      for (const [key] of shown) {
+        if (remove) draftValues.delete(key);
+        else draftValues.add(key);
+      }
+      renderFilterOptions();
+    });
+    document.getElementById('close-filter').addEventListener('click', () => {
+      filterPanel.hidePopover();
+      filterTrigger.focus();
+    });
     filterPanel.addEventListener('toggle', event => {
       if (event.newState === 'closed' && filterTrigger) filterTrigger.setAttribute('aria-expanded', 'false');
     });
     filterPanel.addEventListener('submit', event => {
       event.preventDefault();
-      const value = filterValue.value.trim();
-      if (filterMode.value === 'contains' && !value) filters.delete(filterColumn);
-      else filters.set(filterColumn, { mode: filterMode.value, value });
+      const mode = currentFilterMode();
+      let value = filterValue.value.trim();
+      if (mode === 'values') {
+        if (draftValues.size === columnState.get(filterColumn).values.size) filters.delete(filterColumn);
+        else filters.set(filterColumn, { mode, keys: new Set(draftValues) });
+      } else {
+        const numeric = columnState.get(filterColumn).numeric;
+        const upper = Number(filterUpper.value);
+        if (numeric && (!value || !Number.isFinite(Number(value)) || (mode === 'between' && (!filterUpper.value.trim() || !Number.isFinite(upper) || upper < Number(value))))) {
+          const error = document.getElementById('filter-error');
+          error.textContent = mode === 'between' ? '请输入有效区间，最大值不能小于最小值。' : '请输入有效数值。';
+          error.hidden = false;
+          positionFilter();
+          return;
+        }
+        if (mode === 'contains' && !value) filters.delete(filterColumn);
+        else {
+          if (numeric) value = Number(value);
+          filters.set(filterColumn, { mode, value, ...(mode === 'between' ? { upper } : {}) });
+        }
+      }
       updateView();
       filterPanel.hidePopover();
       filterTrigger.focus();
@@ -409,8 +476,12 @@
       filterTrigger.focus();
     });
     resetButton.addEventListener('click', () => {
-      filters.clear();
       sort = null;
+      filterPanel.hidePopover();
+      updateView();
+    });
+    document.getElementById('clear-all-filters').addEventListener('click', () => {
+      filters.clear();
       filterPanel.hidePopover();
       updateView();
     });
@@ -422,12 +493,10 @@
       columnState.clear();
       sort = null;
       filterPanel.hidePopover();
-      columnsPanel.hidePopover();
-      detail.close();
       const head = document.createElement('thead');
       const headerRow = document.createElement('tr');
       for (const column of data.columns) {
-        columnState.set(column, { width: estimateWidth(column), visible: true, pinned: false });
+        columnState.set(column, { width: estimateWidth(column), ...inspectColumn(column) });
         const cell = document.createElement('th');
         cell.scope = 'col';
         const heading = document.createElement('div');
@@ -472,19 +541,14 @@
       head.append(headerRow);
       table.replaceChildren(head, document.createElement('tbody'));
       table.hidden = false;
-      columnsButton.hidden = false;
-      displayMode.hidden = false;
       document.getElementById('empty').hidden = true;
       updateView();
     }
 
     function updateView() {
       const rows = visibleRows();
-      const columns = displayColumns();
-      const compact = displayMode.value !== 'full';
-      table.classList.toggle('compact', compact);
+      const columns = loadedData.columns;
       for (const [column, heading] of headings) {
-        heading.bodyCells = [];
         const direction = sort?.column === column ? sort.direction : 'none';
         heading.cell.setAttribute('aria-sort', direction);
         heading.mark.textContent = direction === 'ascending' ? '↑' : direction === 'descending' ? '↓' : '↕';
@@ -493,8 +557,32 @@
         heading.sortButton.title = `点击${next}`;
         const condition = filters.get(column);
         heading.filterButton.setAttribute('aria-pressed', String(Boolean(condition)));
-        heading.filterButton.title = condition ? `已筛选：${condition.mode === 'empty' ? '为空' : condition.mode === 'not-empty' ? '不为空' : (condition.mode === 'equals' ? '等于 ' : '包含 ') + condition.value}` : '筛选此列';
+        heading.filterButton.title = condition ? `已筛选：${filterDescription(column, condition)}` : '筛选此列';
       }
+      const chips = document.getElementById('filter-chips');
+      chips.replaceChildren();
+      for (const [column, condition] of filters) {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'filter-chip';
+        const description = `${column}：${filterDescription(column, condition)}`;
+        chip.title = description;
+        chip.setAttribute('aria-label', `移除筛选：${description}`);
+        const text = document.createElement('span');
+        text.textContent = description;
+        const close = document.createElement('span');
+        close.textContent = '×';
+        close.setAttribute('aria-hidden', 'true');
+        chip.append(text, close);
+        chip.addEventListener('click', () => {
+          filters.delete(column);
+          filterPanel.hidePopover();
+          updateView();
+          headings.get(column).filterButton.focus();
+        });
+        chips.append(chip);
+      }
+      activeFilters.hidden = !filters.size;
       const body = document.createElement('tbody');
       for (const row of rows) {
         const tr = document.createElement('tr');
@@ -505,16 +593,6 @@
           content.className = 'cell-text';
           content.textContent = text;
           cell.append(content);
-          if (compact) {
-            const expand = document.createElement('button');
-            expand.type = 'button';
-            expand.className = 'expand-cell';
-            expand.textContent = '查看全文';
-            expand.setAttribute('aria-label', `查看全文：${column}`);
-            expand.addEventListener('click', () => showCellDetail(column, text));
-            cell.append(expand);
-          }
-          headings.get(column).bodyCells.push(cell);
           tr.append(cell);
         }
         body.append(tr);
@@ -531,9 +609,9 @@
       table.tBodies[0].replaceWith(body);
       applyLayout();
       const total = loadedData.rows.length.toLocaleString();
-      const columnCount = columns.length === loadedData.columns.length ? columns.length.toLocaleString() : `${columns.length.toLocaleString()} / ${loadedData.columns.length.toLocaleString()}`;
+      const columnCount = columns.length.toLocaleString();
       document.getElementById('count').textContent = `${filters.size ? `${rows.length.toLocaleString()} / ${total}` : total} 行 · ${columnCount} 列`;
-      resetButton.hidden = !sort && !filters.size;
+      resetButton.hidden = !sort;
     }
 
     importButton.addEventListener('click', () => fileInput.click());
@@ -543,11 +621,9 @@
       errorBox.hidden = true;
       importButton.disabled = true;
       resetButton.disabled = true;
-      columnsButton.disabled = true;
-      displayMode.disabled = true;
       table.inert = true;
+      activeFilters.inert = true;
       filterPanel.hidePopover();
-      columnsPanel.hidePopover();
       const count = document.getElementById('count');
       const previousCount = count.textContent;
       count.textContent = '正在读取…';
@@ -570,9 +646,8 @@
         loading = false;
         importButton.disabled = false;
         resetButton.disabled = false;
-        columnsButton.disabled = false;
-        displayMode.disabled = false;
         table.inert = false;
+        activeFilters.inert = false;
         table.setAttribute('aria-busy', 'false');
       }
     }

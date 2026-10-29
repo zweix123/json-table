@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
-// A small DOM stand-in checks import state transitions without a browser dependency.
+// A small DOM stand-in checks import and filter interactions without a browser dependency.
 function page(html) {
   const makeElement = () => ({
-    value: '', textContent: '', hidden: false, children: [], events: {}, attributes: {}, style: {},
+    get value() { return this._value ?? ''; }, set value(value) { this._value = String(value); },
+    textContent: '', hidden: false, children: [], events: {}, attributes: {}, style: {},
     addEventListener(type, handler) { this.events[type] = handler; },
     append(...children) { for (const child of children) { child.parent = this; this.children.push(child); } },
     replaceChildren(...children) { this.children = []; this.append(...children); },
@@ -17,6 +18,8 @@ function page(html) {
     setAttribute(key, value) { this.attributes[key] = value; },
     click() { this.clicked = true; },
     focus() {}, showPopover() { this.open = true; }, hidePopover() { this.open = false; }, close() { this.open = false; }, showModal() { this.open = true; },
+    getBoundingClientRect() { return { left: 100, bottom: 120 }; },
+    offsetWidth: 300, offsetHeight: 400,
     classList: {
       values: new Set(),
       add(value) { this.values.add(value); }, remove(value) { this.values.delete(value); },
@@ -34,7 +37,7 @@ function page(html) {
   const document = {
     ...makeElement(), body: makeElement(), getElementById: get, createElement: makeElement, createElementNS: makeElement
   };
-  const context = vm.createContext({ document });
+  const context = vm.createContext({ document, innerWidth: 1024, innerHeight: 768 });
   vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], context);
   return { get, document, context };
 }
@@ -143,11 +146,10 @@ test('column sorting, combined filters and resetting the view', async () => {
   context.data = data;
   vm.runInContext('render(data)', context);
   const rows = () => JSON.parse(vm.runInContext('JSON.stringify(visibleRows())', context));
-  const apply = (column, mode, value = '') => {
+  const select = (column, values) => {
     context.column = column;
-    vm.runInContext('filterColumn = column; filterTrigger = { focus() {} }', context);
-    get('filter-mode').value = mode;
-    get('filter-value').value = value;
+    context.values = values;
+    vm.runInContext('openFilter(column, headings.get(column).filterButton); draftValues = new Set(values.map(valueKey))', context);
     get('column-filter').events.submit({ preventDefault() {} });
   };
   vm.runInContext("cycleSort('金额')", context);
@@ -159,34 +161,38 @@ test('column sorting, combined filters and resetting the view', async () => {
   assert.deepEqual(rows(), data.rows);
   vm.runInContext("cycleSort('名称')", context);
   assert.deepEqual(rows().map(row => row.名称), ['任务1', '任务2', '任务10', 'TASK A', '']);
-  apply('名称', 'contains', '任务');
-  apply('完成', 'equals', 'false');
+  select('名称', ['任务10', '任务2', '任务1']);
+  vm.runInContext('openFilter("完成", headings.get("完成").filterButton); draftValues = new Set([valueKey(false)])', context);
+  get('column-filter').events.submit({ preventDefault() {} });
   assert.deepEqual(rows().map(row => row.名称), ['任务1', '任务2']);
   assert.equal(get('count').textContent, '2 / 5 行 · 3 列');
   assert.equal(get('reset-view').hidden, false);
   get('clear-filter').events.click();
   assert.equal(rows().length, 3);
-  apply('名称', 'contains', 'task');
+  select('名称', ['TASK A']);
   assert.equal(rows()[0].名称, 'TASK A');
-  apply('名称', 'empty');
+  select('名称', ['']);
   assert.equal(rows()[0].名称, '');
-  apply('名称', 'not-empty');
+  select('名称', ['任务10', '任务2', '任务1', 'TASK A']);
   assert.equal(rows().length, 4);
-  apply('名称', 'equals', '<script>');
+  select('名称', []);
   assert.equal(rows().length, 0);
   assert.match(get('table').tBodies[0].children[0].children[0].textContent, /没有符合筛选条件/);
   get('reset-view').events.click();
+  assert.equal(rows().length, 0, 'resetting sorting keeps filters');
+  get('clear-all-filters').events.click();
   assert.deepEqual(rows(), data.rows);
   assert.equal(get('reset-view').hidden, true);
   assert.equal(get('count').textContent, '5 行 · 3 列');
   assert.deepEqual(data.rows.map(row => row.金额), [10, 2, null, 2, '']);
-  apply('完成', 'equals', 'true');
+  vm.runInContext('openFilter("完成", headings.get("完成").filterButton); draftValues = new Set([valueKey(true)])', context);
+  get('column-filter').events.submit({ preventDefault() {} });
   vm.runInContext('render(data)', context);
   assert.equal(rows().length, 5);
   assert.equal(get('reset-view').hidden, true);
 });
 
-test('generic column widths, visibility, pinning and full text', async () => {
+test('column widths and full cell content survive sorting and filtering', async () => {
   const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
   const { get, context } = page(html);
   const columns = Array.from({ length: 24 }, (_, index) => `field_${index}`);
@@ -195,41 +201,179 @@ test('generic column widths, visibility, pinning and full text', async () => {
   context.data = { columns, rows };
   vm.runInContext('render(data)', context);
   const run = code => vm.runInContext(code, context);
-  assert.equal(run('displayColumns().length'), 24);
+  assert.equal(get('table').tHead.rows[0].children.length, 24);
   const initialWidth = run('columnState.get("field_3").width');
   assert.ok(initialWidth >= 240 && initialWidth <= 360);
   assert.ok(run('columnState.get("field_5").width') < 360, 'one outlier does not determine initial width');
   assert.ok(parseInt(get('table').style.width) > 2000, 'many columns keep widths rather than compressing to the viewport');
-  run('setColumnWidth("field_3", 470); cycleSort("field_0"); filters.set("field_0", {mode:"equals",value:"2"}); updateView()');
+  run('setColumnWidth("field_3", 470); cycleSort("field_0"); filters.set("field_0", {mode:"equals",value:2}); updateView()');
   assert.equal(run('columnState.get("field_3").width'), 470, 'sorting/filtering keep the chosen width');
-  run('columnState.get("field_7").pinned = true; refreshColumns()');
-  assert.equal(run('displayColumns()[0]'), 'field_7');
-  assert.equal(get('table').tHead.rows[0].children[0].classList.contains('pinned'), true);
-  run('setColumnVisible("field_0", false)');
-  assert.equal(run('displayColumns().length'), 23);
-  assert.equal(run('visibleRows().length'), 1, 'hidden columns continue to filter');
-  assert.equal(get('count').textContent, '1 / 20 行 · 23 / 24 列');
-  get('show-all-columns').events.click();
-  assert.equal(run('displayColumns().length'), 24);
-  run('for (const column of loadedData.columns.slice(1)) setColumnVisible(column, false); setColumnVisible("field_0", false)');
-  assert.equal(run('displayColumns().length'), 1, 'at least one column stays visible');
-  get('show-all-columns').events.click();
-  const longCell = get('table').tBodies[0].children[0].children[4];
-  assert.equal(longCell.children[0].textContent, text, 'compact mode preserves the full value');
-  assert.equal(longCell.children[1].textContent, '查看全文');
-  longCell.children[1].events.click();
-  assert.equal(get('detail-text').textContent, text);
-  assert.equal(get('cell-detail').open, true);
-  get('close-detail').events.click();
-  assert.equal(get('cell-detail').open, false);
-  get('display-mode').value = 'full';
-  get('display-mode').events.change();
-  assert.equal(get('table').classList.contains('compact'), false);
-  assert.equal(get('table').tBodies[0].children[0].children[4].children.length, 1);
-  get('reset-widths').events.click();
-  assert.equal(run('columnState.get("field_3").width'), initialWidth);
+  assert.equal(get('count').textContent, '1 / 20 行 · 24 列');
+  const longCell = get('table').tBodies[0].children[0].children[3];
+  assert.equal(longCell.children[0].textContent, text, 'the full value is displayed directly');
+  assert.equal(longCell.children.length, 1);
   run('render(data)');
-  assert.equal(run('displayColumns()[0]'), 'field_0');
-  assert.equal(run('displayColumns().length'), 24);
+  assert.equal(run('columnState.get("field_3").width'), initialWidth);
+  assert.equal(get('table').tHead.rows[0].children.length, 24);
   assert.equal(run('filters.size'), 0);
+});
+
+test('value selection keeps JSON types, drafts, searched selections and facet counts', async () => {
+  const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const { get, context } = page(html);
+  context.data = {
+    columns: ['值', '地区'],
+    rows: [1, '1', true, 'true', null, '', '张三', '李四', '张三'].map((value, i) => ({ 值: value, 地区: i % 2 ? '上海' : '北京' }))
+  };
+  const run = code => vm.runInContext(code, context);
+  const open = column => { context.column = column; run('openFilter(column, headings.get(column).filterButton)'); };
+  const submit = () => get('column-filter').events.submit({ preventDefault() {} });
+  const search = value => { get('filter-search').value = value; get('filter-search').events.input(); };
+  const option = text => get('filter-options').children.find(label => label.children[1].textContent === text);
+  const toggle = (text, checked) => { const checkbox = option(text).children[0]; checkbox.checked = checked; checkbox.events.change(); };
+  run('render(data)');
+  open('值');
+  assert.equal(get('number-filter').hidden, true, 'value columns do not expose a mode selector');
+  assert.equal(get('number-mode').disabled, true);
+  assert.equal(get('filter-values').hidden, false);
+  assert.equal(get('filter-value').disabled, true);
+  assert.equal(option('张三').children[2].textContent, '2');
+  search('张');
+  get('select-filter-values').events.click(); // Only deselect the searched value.
+  search('李');
+  toggle('李四', false);
+  assert.equal(run('visibleRows().length'), 9, 'drafts and candidate search do not filter the table');
+  get('close-filter').events.click();
+  open('值');
+  assert.equal(run('draftValues.size'), 8, 'closing without applying discards the draft');
+  get('select-filter-values').events.click(); // Deselect all.
+  toggle('1', true);
+  toggle('李四', true);
+  submit();
+  assert.equal(run('visibleRows().length'), 2, 'same-column selected values use OR');
+  assert.equal(run('typeof visibleRows()[0].值'), 'string', 'text 1 does not also select numeric 1');
+  assert.equal(get('filter-chips').children.length, 1);
+  assert.equal(get('active-filters').hidden, false);
+  open('值');
+  assert.equal(option('1 · 数字').children[2].textContent, '1', 'facet counts ignore this column’s applied filter');
+  search('true');
+  get('select-filter-values').events.click();
+  submit();
+  assert.equal(run('visibleRows().length'), 4, 'selecting search results preserves earlier selections');
+  open('地区');
+  get('select-filter-values').events.click();
+  toggle('北京', true);
+  submit();
+  assert.equal(run('visibleRows().length'), 1, 'different columns use AND');
+  assert.equal(run('visibleRows()[0].值'), true);
+  open('值');
+  assert.equal(option('true').children[2].textContent, '0', 'counts reflect other columns');
+  assert.equal(option('是 · true').children[2].textContent, '1');
+  get('clear-all-filters').events.click();
+  open('值');
+  get('select-filter-values').events.click();
+  toggle('（空值 · null）', true);
+  submit();
+  assert.equal(run('visibleRows().length'), 1);
+  assert.equal(run('visibleRows()[0].值'), null, 'null and an empty string are distinct options');
+  get('filter-chips').children[0].events.click();
+  assert.equal(run('visibleRows().length'), 9);
+  assert.equal(get('active-filters').hidden, true);
+  open('值');
+  search('不存在');
+  assert.equal(get('select-filter-values').disabled, true);
+  assert.match(get('filter-options').textContent, /没有匹配/);
+});
+
+test('numeric comparisons, ranges, invalid input, empty selections and independent resets', async () => {
+  const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const { get, context } = page(html);
+  context.data = { columns: ['金额', '完成'], rows: [-2.5, 0, 2, 10, null].map((value, i) => ({ 金额: value, 完成: i % 2 === 0 })) };
+  const run = code => vm.runInContext(code, context);
+  const open = column => { context.column = column; run('openFilter(column, headings.get(column).filterButton)'); };
+  const submit = () => get('column-filter').events.submit({ preventDefault() {} });
+  const apply = (mode, value, upper = '') => {
+    open('金额'); get('number-mode').value = mode; get('number-mode').events.change();
+    get('filter-value').value = value; get('filter-upper').value = upper; submit();
+  };
+  run('render(data)');
+  open('金额');
+  assert.equal(get('number-filter').hidden, false);
+  assert.equal(get('number-mode').disabled, false);
+  assert.equal(get('number-mode').value, 'gte');
+  assert.equal(get('filter-values').hidden, true, 'numeric columns only expose comparisons');
+  assert.equal(get('filter-value').type, 'number');
+  assert.equal(get('filter-upper').disabled, true);
+  apply('gte', '0');
+  assert.equal(run('visibleRows().length'), 3, 'null does not compare as zero');
+  apply('gt', '2'); assert.equal(run('visibleRows()[0].金额'), 10);
+  apply('lte', '0'); assert.equal(run('visibleRows().length'), 2);
+  apply('lt', '0'); assert.equal(run('visibleRows()[0].金额'), -2.5);
+  apply('equals', '0'); assert.equal(run('visibleRows().length'), 1);
+  open('金额'); submit();
+  assert.equal(run('visibleRows()[0].金额'), 0, 'reopening and applying preserves a zero-valued condition');
+  apply('between', '-2.5', '2'); assert.equal(run('visibleRows().length'), 3);
+  assert.equal(get('filter-upper').disabled, false);
+  for (const [value, upper] of [['5', '2'], ['', '2'], ['0', ''], ['Infinity', '2']]) {
+    apply('between', value, upper);
+    assert.equal(get('filter-error').hidden, false);
+    assert.equal(get('column-filter').open, true);
+    assert.equal(run('visibleRows().length'), 3, 'invalid input preserves the applied condition');
+  }
+  get('clear-filter').events.click();
+  open('完成');
+  assert.equal(get('number-filter').hidden, true);
+  assert.equal(get('filter-values').hidden, false);
+  assert.equal(get('filter-value').hidden, true);
+  assert.equal(get('filter-upper').disabled, true, 'switching away from numeric ranges disables the upper bound');
+  get('select-filter-values').events.click();
+  submit();
+  assert.equal(run('visibleRows().length'), 0, 'selecting nothing means no matches');
+  open('完成');
+  get('select-filter-values').events.click();
+  submit();
+  assert.equal(run('filters.has("完成")'), false, 'selecting every value removes that condition');
+  run('cycleSort("金额")');
+  get('clear-all-filters').events.click();
+  assert.equal(run('sort.direction'), 'ascending', 'clear filters preserves sorting');
+  assert.equal(get('active-filters').hidden, true);
+  apply('gte', '2');
+  get('reset-view').events.click();
+  assert.equal(run('sort'), null);
+  assert.equal(run('visibleRows().length'), 2, 'reset sorting preserves filtering');
+});
+
+test('text columns expose only keyword input and restore applied keywords', async () => {
+  const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const { get, context } = page(html);
+  context.data = {
+    columns: ['编号', '备注', '对象', '字符串数字'],
+    rows: Array.from({ length: 101 }, (_, i) => ({ 编号: `id-${i}`, 备注: '很长的备注'.repeat(30), 对象: { id: i }, 字符串数字: String(i % 2) }))
+  };
+  const run = code => vm.runInContext(code, context);
+  run('render(data)');
+  for (const column of ['编号', '备注', '对象']) {
+    context.column = column; run('openFilter(column, headings.get(column).filterButton)');
+    assert.equal(get('number-filter').hidden, true);
+    assert.equal(get('number-mode').disabled, true);
+    assert.equal(get('filter-values').hidden, true);
+    assert.equal(get('filter-value').type, 'text');
+    assert.equal(get('filter-value').hidden, false);
+    assert.equal(get('filter-value-label').textContent, '包含关键词（不区分大小写）');
+  }
+  run('openFilter("编号", headings.get("编号").filterButton)');
+  get('filter-value').value = 'ID-10';
+  get('column-filter').events.submit({ preventDefault() {} });
+  assert.equal(run('visibleRows().length'), 2, 'keyword matching is case-insensitive');
+  run('openFilter("编号", headings.get("编号").filterButton)');
+  assert.equal(get('filter-value').value, 'ID-10');
+  get('filter-value').value = '';
+  get('column-filter').events.submit({ preventDefault() {} });
+  assert.equal(run('filters.size'), 0, 'an empty keyword clears the filter');
+  run('openFilter("字符串数字", headings.get("字符串数字").filterButton)');
+  assert.equal(get('filter-values').hidden, false, 'numeric-looking strings use value selection');
+  assert.equal(run('columnState.get("字符串数字").numeric'), false);
+  run('render({columns:["空列"],rows:[]}); openFilter("空列", headings.get("空列").filterButton)');
+  assert.equal(get('number-filter').hidden, true);
+  assert.equal(get('filter-value').hidden, false, 'empty columns still have a keyword input');
 });

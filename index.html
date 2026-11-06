@@ -23,6 +23,10 @@
     .meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 0; max-width: 180px; margin-left: auto; color: #67758a; font-size: 12px; line-height: 1.3; }
     #filename { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     #count { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    #export-menu { inset: auto; margin: 0; width: min(220px, calc(100vw - 24px)); padding: 6px; border: 1px solid #bdc9da; border-radius: 8px; box-shadow: 0 6px 24px #26344926; background: #fff; color: #263449; }
+    #export-menu p { margin: 6px 8px; color: #67758a; font-size: 12px; }
+    #export-menu button { width: 100%; justify-content: flex-start; background: #fff; color: #263449; font-weight: 400; }
+    #export-menu button:hover { background: #edf4ff; }
     .table-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #dfe5ed; border-radius: 6px; background: #fff; }
     .table-wrap { flex: 1; min-height: 0; overflow: auto; }
     .empty { height: 100%; min-height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; color: #758296; font-size: 14px; }
@@ -79,6 +83,7 @@
     <h1>JSON 表格</h1>
     <button id="import" class="secondary" type="button">选择文件…</button>
     <input id="file" type="file" accept=".json,application/json" hidden>
+    <button id="export" class="secondary" type="button" popovertarget="export-menu" disabled>导出为 ▾</button>
     <button id="reset-view" class="secondary" type="button" hidden>重置排序</button>
     <div class="meta" role="status" aria-live="polite">
       <span id="filename">尚未打开文件</span>
@@ -99,6 +104,11 @@
       </div>
     </div>
   </main>
+  <div id="export-menu" popover aria-label="导出表格">
+    <p>导出当前筛选、排序后的结果</p>
+    <button id="export-csv" type="button">CSV（.csv）</button>
+    <button id="export-excel" type="button">Excel（.xlsx）</button>
+  </div>
   <form id="column-filter" popover role="dialog" aria-labelledby="filter-title">
     <div class="filter-heading"><h2 id="filter-title"></h2><button id="close-filter" type="button" aria-label="关闭筛选">×</button></div>
     <div id="number-filter" hidden>
@@ -135,6 +145,8 @@
     const table = document.getElementById('table');
     const errorBox = document.getElementById('error');
     const resetButton = document.getElementById('reset-view');
+    const exportButton = document.getElementById('export');
+    const exportMenu = document.getElementById('export-menu');
     const filterPanel = document.getElementById('column-filter');
     const numberMode = document.getElementById('number-mode');
     const filterValue = document.getElementById('filter-value');
@@ -180,6 +192,124 @@
     function cellText(value) {
       return typeof value === 'string' ? value : JSON.stringify(value);
     }
+
+    function csvCell(value) {
+      let text = value === null ? '' : cellText(value);
+      // Quoting alone does not stop spreadsheet applications from evaluating formulas.
+      if (typeof value === 'string' && (/^\s*[=+\-@]/u.test(text) || /^[\t\r\n]/.test(text))) text = "'" + text;
+      return `"${text.replaceAll('"', '""')}"`;
+    }
+
+    function csvFile(columns, rows) {
+      return new Blob(['\uFEFF', [columns.map(csvCell).join(','), ...rows.map(row => columns.map(column => csvCell(row[column])).join(','))].join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
+    }
+
+    function excelText(text) {
+      if (text.length > 32767) throw new Error('Excel 单元格最多支持 32,767 个字符，请改用 CSV 导出。');
+      return text.replace(/_x[\da-f]{4}_/gi, match => '_x005F_' + match.slice(1))
+        .replace(/[\u0000-\u0008\u000B-\u001F\uFFFE\uFFFF]|[\uD800-\uDFFF]/gu, char => `_x${char.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}_`)
+        .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+    }
+
+    // The five XML parts below use an uncompressed ZIP to keep the page standalone and offline.
+    function zipFiles(files) {
+      const encoder = new TextEncoder();
+      const crcTable = Array.from({ length: 256 }, (_, index) => {
+        let crc = index;
+        for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+        return crc >>> 0;
+      });
+      const parts = [], directory = [];
+      let offset = 0, directorySize = 0;
+      for (const [path, xml] of Object.entries(files)) {
+        const name = encoder.encode(path), data = encoder.encode(xml);
+        let crc = 0xFFFFFFFF;
+        for (const byte of data) crc = (crc >>> 8) ^ crcTable[(crc ^ byte) & 255];
+        crc = (crc ^ 0xFFFFFFFF) >>> 0;
+        const local = new Uint8Array(30 + name.length), localView = new DataView(local.buffer);
+        localView.setUint32(0, 0x04034B50, true);
+        localView.setUint16(4, 20, true);
+        localView.setUint16(12, 0x21, true);
+        localView.setUint32(14, crc, true);
+        localView.setUint32(18, data.length, true);
+        localView.setUint32(22, data.length, true);
+        localView.setUint16(26, name.length, true);
+        local.set(name, 30);
+        const central = new Uint8Array(46 + name.length), centralView = new DataView(central.buffer);
+        centralView.setUint32(0, 0x02014B50, true);
+        centralView.setUint16(4, 20, true);
+        central.set(local.subarray(4, 30), 6);
+        centralView.setUint32(42, offset, true);
+        central.set(name, 46);
+        parts.push(local, data);
+        directory.push(central);
+        offset += local.length + data.length;
+        directorySize += central.length;
+      }
+      const end = new Uint8Array(22), endView = new DataView(end.buffer);
+      endView.setUint32(0, 0x06054B50, true);
+      endView.setUint16(8, directory.length, true);
+      endView.setUint16(10, directory.length, true);
+      endView.setUint32(12, directorySize, true);
+      endView.setUint32(16, offset, true);
+      return new Blob([...parts, ...directory, end], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    }
+
+    function excelFile(columns, rows) {
+      if (columns.length > 16384 || rows.length + 1 > 1048576) throw new Error('数据超出 Excel 的行列上限，请改用 CSV 导出。');
+      const letters = columns.map((_, index) => {
+        let name = '';
+        for (let number = index + 1; number; number = Math.floor((number - 1) / 26)) name = String.fromCharCode(65 + (number - 1) % 26) + name;
+        return name;
+      });
+      const sheetRows = [];
+      const addRow = (values, index) => sheetRows.push(`<row r="${index}">${values.map((value, column) => {
+        const reference = `${letters[column]}${index}`;
+        if (value === null) return `<c r="${reference}"/>`;
+        if (typeof value === 'number') return `<c r="${reference}"><v>${value}</v></c>`;
+        if (typeof value === 'boolean') return `<c r="${reference}" t="b"><v>${Number(value)}</v></c>`;
+        return `<c r="${reference}" t="inlineStr"><is><t xml:space="preserve">${excelText(cellText(value))}</t></is></c>`;
+      }).join('')}</row>`);
+      addRow(columns, 1);
+      rows.forEach((row, index) => addRow(columns.map(column => row[column]), index + 2));
+      const spreadsheet = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+      const relationships = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+      const packageRelationships = 'http://schemas.openxmlformats.org/package/2006/relationships';
+      return zipFiles({
+        '[Content_Types].xml': '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
+        '_rels/.rels': `<Relationships xmlns="${packageRelationships}"><Relationship Id="rId1" Type="${relationships}/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
+        'xl/workbook.xml': `<workbook xmlns="${spreadsheet}" xmlns:r="${relationships}"><sheets><sheet name="表格" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+        'xl/_rels/workbook.xml.rels': `<Relationships xmlns="${packageRelationships}"><Relationship Id="rId1" Type="${relationships}/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`,
+        'xl/worksheets/sheet1.xml': `<worksheet xmlns="${spreadsheet}"><sheetData>${sheetRows.join('')}</sheetData></worksheet>`
+      });
+    }
+
+    function exportFile(format) {
+      if (!loadedData || loading) return;
+      exportMenu.hidePopover();
+      try {
+        const rows = visibleRows();
+        const blob = format === 'csv' ? csvFile(loadedData.columns, rows) : excelFile(loadedData.columns, rows);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = (document.getElementById('filename').textContent.replace(/\.json$/i, '') || '表格') + '.' + format;
+        document.body.append(link);
+        try { link.click(); }
+        finally { link.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000); }
+        errorBox.hidden = true;
+      } catch (error) {
+        showError(`导出失败：${error.message}`);
+      }
+    }
+
+    exportButton.addEventListener('click', () => {
+      const rect = exportButton.getBoundingClientRect();
+      exportMenu.style.left = `${Math.max(12, Math.min(rect.left, innerWidth - 232))}px`;
+      exportMenu.style.top = `${rect.bottom + 6}px`;
+    });
+    document.getElementById('export-csv').addEventListener('click', () => exportFile('csv'));
+    document.getElementById('export-excel').addEventListener('click', () => exportFile('xlsx'));
 
     function isEmpty(value) { return value === null || cellText(value).trim() === ''; }
 
@@ -542,6 +672,7 @@
       table.replaceChildren(head, document.createElement('tbody'));
       table.hidden = false;
       document.getElementById('empty').hidden = true;
+      exportButton.disabled = loading;
       updateView();
     }
 
@@ -621,6 +752,8 @@
       errorBox.hidden = true;
       importButton.disabled = true;
       resetButton.disabled = true;
+      exportButton.disabled = true;
+      exportMenu.hidePopover();
       table.inert = true;
       activeFilters.inert = true;
       filterPanel.hidePopover();
@@ -646,6 +779,7 @@
         loading = false;
         importButton.disabled = false;
         resetButton.disabled = false;
+        exportButton.disabled = !loadedData;
         table.inert = false;
         activeFilters.inert = false;
         table.setAttribute('aria-busy', 'false');
